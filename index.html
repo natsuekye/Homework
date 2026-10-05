@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <!-- 모바일 필수: 이 태그가 없으면 폰에서 PC용 화면처럼 축소되어 터치가 스크롤/확대로 해석됨 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
-    <title>과제 모음</title>
+    <title>Homework</title>
     <style>
       /* 허브 페이지는 절대 스크롤/선택되지 않게 고정 (아이폰에서 터치가 페이지 스크롤로 새는 것 방지) */
       html, body {
@@ -53,14 +53,14 @@
   </head>
   <body>
     <div id="menu">
-      <a onclick="loadHomework('Homework1')">Homework1</a>
-      <a onclick="loadHomework('Homework2')">Homework2</a>
+      <a onclick="loadHomework('Dynamic Balance')">Dynamic Balance</a>
+      <a onclick="loadHomework('Delete, Delete, Delete')">Delete, Delete, Delete</a>
       <a onclick="loadHomework('Homework3')">Homework3</a>
     </div>
 
     <div id="stage">
       <!-- 처음 열었을 때 보여줄 과제 -->
-      <iframe id="viewer" src="Homework1/index.html"></iframe>
+      <iframe id="viewer" src="Delete, Delete, Delete/index.html"></iframe>
     </div>
 
     <script>
