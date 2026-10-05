@@ -1,24 +1,29 @@
 <!doctype html>
-<html>
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <!-- 모바일 필수: 폰에서 PC용 화면처럼 축소되는 것 방지 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
-    <title>Homework1</title>
+    <title>Delete, Delete, Delete</title>
+    
+    <!-- p5.js 라이브러리 (CDN 적용) -->
     <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
+    
+    <!-- Matter.js 라이브러리 (기존 수업 환경의 로컬 경로 유지) -->
+    <script src="../addons/matter.js"></script>
+
     <style>
       html, body {
         height: 100%;
-        padding: 0;
         margin: 0;
+        padding: 0;
         overflow: hidden;
-        background-color: #ffffff;
+        background-color: #9cdca6;
       }
       /* 터치 필수: 브라우저가 스크롤/확대 대신 코드에 터치를 넘기도록 함.
          iOS Safari는 canvas가 아니라 body에 걸어야 인정함 */
       body {
         touch-action: none;
-        overflow: none;
         overscroll-behavior: none;
         -webkit-user-select: none;
         user-select: none;
@@ -28,16 +33,16 @@
         touch-action: none;
       }
     </style>
-    <script src="../p5.min.js"></script>
-    <!-- <script src="../addons/p5.sound.js"></script> -->
-    <script src="../addons/matter.js"></script>
-    <script src="sketch.js"></script>
   </head>
   <body>
     <script>
       // 터치 필수: Safari는 CSS만으로는 드래그 스크롤을 완전히 못 막아서 스크립트로 한 번 더 차단
       document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
     </script>
+    
+    <!-- 직접 작성한 자바스크립트 파일들 -->
+    <!-- 반드시 객체 클래스인 Butterfly.js를 먼저 불러와야 sketch.js에서 인식합니다. -->
+    <script src="Butterfly.js"></script>
     <script src="sketch.js"></script>
   </body>
 </html>
