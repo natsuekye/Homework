@@ -1,41 +1,16 @@
-// =====================================================
-// text.js : 자판으로 치는 글 메모
-//
-// [생각]
-//   손으로 쓰는 글씨도, 자판으로 치는 글도 결국 "김을 닦아낸 자리" 입니다.
-//   그래서 타이핑한 글자도 유리에서 김이 지워지며 나타나고,
-//   길게 쓸수록 창이 넓게 닦여 창밖이 더 많이 드러납니다.
-//   (짧은 낙서 = 손가락 / 긴 이야기 = 자판)
-//
-// [규칙은 손글씨와 똑같습니다]
-//   그냥 두면 김이 다시 차서 사라지고,
-//   입김을 불면 그 자리의 글자만 지워지고,
-//   얼리면 성에가 되어 남고,
-//   흘려보내면 물방울 안에 담깁니다.
-//
-// 좌표는 글 덩어리의 왼쪽 위를 기준으로 한 '속 좌표(px)' 로 두고,
-// 덩어리의 위치만 0~1 로 저장해서 창 크기가 바뀌어도 자리를 지킵니다.
-// =====================================================
-
-// 주의 : p5 에는 textSize·textBounds 처럼 text/font 로 시작하는 함수가 이미 있어서,
-// 여기서 만드는 함수에는 앞에 memo 를 붙여 이름이 겹치지 않게 했습니다.
-
-// 손글씨 느낌 글꼴이 있으면 먼저 쓰고, 없으면 기본 고딕으로
 const TEXT_FONT =
   "'Nanum Pen Script', 'Gaegu', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif";
 
 const TEXT = {
-  editing: null, // 지금 치고 있는 글 메모
-  el: null, // 화면에 보이지 않는 입력칸 (키보드를 올리는 역할)
+  editing: null,
+  el: null,
   caretT0: 0,
 };
 
-// 글자 크기는 굵기 슬라이더를 같이 씁니다 (굵게 = 크게)
 function memoTextSize() {
   return U.clamp(wipeWidth() * 1.9, 18, 64);
 }
 
-// 글자 폭을 재기 위한 보이지 않는 캔버스
 let _meas = null;
 function measCtx() {
   if (!_meas) _meas = document.createElement("canvas").getContext("2d");
@@ -45,8 +20,6 @@ function memoFontStr(px) {
   return Math.round(px) + "px " + TEXT_FONT;
 }
 
-// ---------- 글자 배치 ----------
-// 줄 끝에 닿으면 다음 줄로 넘깁니다 (한글은 글자 단위로 넘겨도 자연스러워요)
 function layoutText(t) {
   const px = t.sizeR * Math.min(VW, VH);
   const key = VW + "x" + VH + "|" + Math.round(px);
@@ -83,18 +56,16 @@ function layoutText(t) {
   t._str = t.str;
 }
 
-// 글자마다 아주 조금씩 삐뚤게 (자판 글씨도 손으로 쓴 것처럼 보이게)
 function jitter(seed, i) {
   const a = U.hash01(seed + i * 7.13);
   const b = U.hash01(seed + i * 3.77 + 99);
   return { dx: (a - 0.5) * 0.09, dy: (b - 0.5) * 0.12, rot: (a - 0.5) * 0.07 };
 }
 
-// ---------- 새 글 메모 ----------
 function newTextMemo(xPx, yPx) {
   const px = memoTextSize();
   const m = Math.max(16, VW * 0.04);
-  // 키보드가 아래쪽을 가리므로 글은 화면 위쪽에서 시작하게 둡니다
+
   const x = U.clamp(xPx, m, VW * 0.7);
   const y = U.clamp(yPx, px, VH * 0.42);
   const t = {
@@ -116,7 +87,6 @@ function newTextMemo(xPx, yPx) {
   return t;
 }
 
-// ---------- 입력칸 ----------
 function bindTextInput() {
   const el = document.getElementById("typer");
   TEXT.el = el;
@@ -124,7 +94,7 @@ function bindTextInput() {
     const t = TEXT.editing;
     if (!t) return;
     t.str = el.value;
-    t.t0 = Date.now(); // 쓰는 동안에는 김이 다시 차지 않게
+    t.t0 = Date.now();
     layoutText(t);
     keepCaretVisible(t);
     TEXT.caretT0 = performance.now();
@@ -140,8 +110,6 @@ function bindTextInput() {
   });
 }
 
-// 폰에서는 키보드가 화면 아래쪽을 가립니다.
-// 글이 길어져 커서가 키보드에 가리면, 글 덩어리를 위로 밀어 올려 줍니다.
 function keepCaretVisible(t) {
   const vh = window.visualViewport ? window.visualViewport.height : VH;
   const bottom = vh - t.px * 1.3;
@@ -159,7 +127,7 @@ function startTyping(xPx, yPx) {
   const el = TEXT.el;
   if (el) {
     el.value = "";
-    // 키보드를 띄우려면 사용자가 손을 뗀 그 순간에 바로 focus 해야 합니다 (특히 아이폰)
+
     el.focus({ preventScroll: true });
   }
   hideIntroHint();
@@ -172,7 +140,7 @@ function stopTyping() {
   TEXT.editing = null;
   if (TEXT.el) TEXT.el.blur();
   if (!t) return;
-  // 한 글자도 안 쳤으면 없던 일로
+
   if (!t.str.trim()) {
     const i = MEMO.strokes.indexOf(t);
     if (i >= 0) MEMO.strokes.splice(i, 1);
@@ -183,11 +151,8 @@ function isTyping() {
   return !!TEXT.editing;
 }
 
-// ---------- 그리기 ----------
-// 글 덩어리를 한 글자씩 훑으며 callback 을 부릅니다.
-// cb(글자, 가운데x, 가운데y, 기울기, 글자폭)
 function eachGlyph(t, cb) {
-  const src = t.src || t; // 물방울로 모일 때는 원본을 참조
+  const src = t.src || t;
   layoutText(src);
   const ox = src.x * VW,
     oy = src.y * VH;
@@ -209,8 +174,6 @@ function eachGlyph(t, cb) {
   }
 }
 
-// 김 서린 유리에서 글자 자리를 지우기 (손글씨와 같은 질감)
-// mode : "halo" = 닦인 자리 가장자리의 밝은 테두리 / "erase" = 실제로 지우기
 function memoTextPass(ctx, t, lk, mode) {
   const src = t.src || t;
   layoutText(src);
@@ -223,7 +186,7 @@ function memoTextPass(ctx, t, lk, mode) {
 
   ctx.save();
   if (t.gs !== undefined) {
-    // 물방울로 모여드는 중 : 가운데로 오그라듦
+
     ctx.translate(t.gc.x, t.gc.y);
     ctx.scale(t.gs, t.gs);
     ctx.translate(-t.gc.x, -t.gc.y);
@@ -251,7 +214,6 @@ function memoTextPass(ctx, t, lk, mode) {
   ctx.restore();
 }
 
-// 치는 중에 깜빡이는 커서
 function drawCaret(ctx, now) {
   const t = TEXT.editing;
   if (!t) return;
@@ -272,8 +234,6 @@ function drawCaret(ctx, now) {
   ctx.restore();
 }
 
-// ---------- 입김으로 글자 지우기 ----------
-// 원 안에 들어온 글자만 하나씩 사라집니다 (문장 가운데가 지워지는 모습)
 function trimText(t, cx, cy, rr) {
   const r2 = rr * rr;
   let left = 0,
@@ -290,8 +250,6 @@ function trimText(t, cx, cy, rr) {
   return { empty: left === 0, cut: cut };
 }
 
-// ---------- 성에(얼리기)용 ----------
-// 글자를 하나씩 순서대로 덮으며 얼어붙습니다
 function memoTextUnion(ctx, t, k, add, p) {
   const src = t.src || t;
   layoutText(src);
@@ -303,7 +261,7 @@ function memoTextUnion(ctx, t, k, add, p) {
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   eachGlyph(t, (c, x, y, rot, w, _px, i) => {
-    if (i / n > p) return; // 아직 얼지 않은 글자
+    if (i / n > p) return;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(rot);
@@ -314,7 +272,6 @@ function memoTextUnion(ctx, t, k, add, p) {
   });
 }
 
-// 반짝임이 맺힐 자리
 function memoTextSparkles(t) {
   const sp = [];
   let i = 0;
@@ -324,7 +281,6 @@ function memoTextSparkles(t) {
   return sp;
 }
 
-// ---------- 물방울 안에 글 그리기 ----------
 function memoTextBounds(t) {
   layoutText(t);
   let x0 = 1e9,
@@ -341,7 +297,6 @@ function memoTextBounds(t) {
   return { x0: x0, y0: y0, x1: x1, y1: y1 };
 }
 
-// 물방울(또는 펼친 화면) 안에 s 배율로 글을 그립니다
 function drawTextScaled(ctx, t, s) {
   layoutText(t);
   const px = t.px * s;

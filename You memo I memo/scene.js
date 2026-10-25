@@ -1,13 +1,3 @@
-// =====================================================
-// scene.js : "창밖 풍경" 그리기
-// - 현재 시각(hour)에 따라 하늘색, 해/달, 별, 건물 창문의 불빛이 부드럽게 바뀝니다.
-// - 이 풍경은 두 곳에서 쓰여요
-//     1) 김이 닦인 곳에서 "선명하게" 보이는 풍경
-//     2) 흐리게 만들어서 김 서린 유리의 배경으로
-// - 난수는 시드를 고정해서, 시간이 지나도 건물 모양이 바뀌지 않아요.
-// =====================================================
-
-// 시간대별 색 (h: 시각, 나머지는 [r,g,b])
 const SKY_KEYS = [
   { h: 0,    top: [7, 10, 26],    hor: [24, 32, 62],    far: [30, 38, 70],    mid: [18, 24, 48],   near: [9, 12, 28],   lights: 1.0,  stars: 1.0 },
   { h: 4.6,  top: [10, 15, 40],   hor: [36, 44, 78],    far: [40, 50, 84],    mid: [24, 30, 58],   near: [11, 15, 32],  lights: 0.85, stars: 0.9 },
@@ -23,7 +13,6 @@ const SKY_KEYS = [
 ];
 SKY_KEYS.push(Object.assign({}, SKY_KEYS[0], { h: 24 }));
 
-// 시각 → 보간된 하늘 상태
 function skyState(hour) {
   const h = ((hour % 24) + 24) % 24;
   let a = SKY_KEYS[0], b = SKY_KEYS[1];
@@ -35,11 +24,10 @@ function skyState(hour) {
   ["top", "hor", "far", "mid", "near"].forEach((k) => (S[k] = U.mix(a[k], b[k], t)));
   ["lights", "stars"].forEach((k) => (S[k] = U.lerp(a[k], b[k], t)));
   const lum = (c) => 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
-  S.dark = U.clamp(1 - (lum(S.top) + lum(S.hor)) / 300, 0, 1); // 0: 한낮, 1: 한밤
+  S.dark = U.clamp(1 - (lum(S.top) + lum(S.hor)) / 300, 0, 1);
   return S;
 }
 
-// 부드러운 빛 번짐 (해 / 달)
 function glow(ctx, x, y, r, col, a) {
   const g = ctx.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, U.rgb(col, a));
@@ -51,14 +39,11 @@ function glow(ctx, x, y, r, col, a) {
   ctx.fill();
 }
 
-// 창밖 풍경을 레이어 L에 그리기. 하늘 상태 S를 돌려줍니다.
-// 창밖에는 하늘만 둡니다 (건물·땅·나무 없음) — 유리를 닦았을 때 하늘이 그대로 드러나도록.
 function renderScene(L, hour) {
   const ctx = L.x, w = L.w, h = L.h;
   const S = skyState(hour);
-  const hy = h * 0.82;   // 해와 달이 뜨고 지는 높이
+  const hy = h * 0.82;
 
-  // 1. 하늘
   const sky = ctx.createLinearGradient(0, 0, 0, h);
   sky.addColorStop(0, U.rgb(S.top));
   sky.addColorStop(0.62, U.rgb(U.mix(S.top, S.hor, 0.45)));
@@ -66,7 +51,6 @@ function renderScene(L, hour) {
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, w, h);
 
-  // 2. 별
   if (S.stars > 0.02) {
     const sr = U.rng(11);
     for (let i = 0; i < 190; i++) {
@@ -76,13 +60,12 @@ function renderScene(L, hour) {
     }
   }
 
-  // 3. 해
   const sunT = (S.hour - 6.2) / 12.6;
   if (sunT > -0.1 && sunT < 1.1) {
     const tt = U.clamp(sunT, 0, 1);
     const sx = w * (0.14 + 0.72 * sunT);
     const sy = hy * (1 - 0.86 * Math.sin(Math.PI * sunT));
-    const low = 1 - Math.sin(Math.PI * tt);       // 0: 한낮, 1: 지평선
+    const low = 1 - Math.sin(Math.PI * tt);
     const gc = U.mix([255, 246, 222], [255, 138, 66], low);
     glow(ctx, sx, sy, w * 0.34, gc, 0.55);
     glow(ctx, sx, sy, w * 0.1, gc, 0.9);
@@ -90,7 +73,6 @@ function renderScene(L, hour) {
     ctx.beginPath(); ctx.arc(sx, sy, Math.min(w, h) * 0.04, 0, TAU); ctx.fill();
   }
 
-  // 4. 달
   const moonT = ((S.hour - 19 + 24) % 24) / 12.4;
   const moonA = U.smooth(U.clamp((S.dark - 0.35) / 0.3, 0, 1));
   if (moonT < 1 && moonA > 0.01) {
@@ -107,7 +89,6 @@ function renderScene(L, hour) {
     }
   }
 
-  // 5. 구름 (부드러운 원을 여러 개 겹쳐서)
   const cloudBase = U.mix(U.mix([255, 255, 255], S.hor, 0.38), S.top, S.dark * 0.7);
   const cloudCol = cloudBase.map((v) => v * (1 - 0.72 * S.dark));
   const cr = U.rng(23);

@@ -1,19 +1,10 @@
-// =====================================================
-// frost.js : "성에로 얼리기" (저장)
-// - 얼어붙은 획은 입김으로도 지워지지 않고, 김이 다시 차올라도 사라지지 않아요.
-// - 모습: ① 닦인 자리에 얼음 질감이 얇게 덮이고 ② 가장자리에서 고사리 모양 결정이 뻗어 나가요.
-//   결정은 "가지 → 곁가지 → 곁곁가지" 3단계로 자라는 선을 시간차를 두고 그려서 만들어요.
-// - 다 자란 성에는 한 장의 레이어(FROSTL)에 구워 두고, 자라는 중인 것만 매 프레임 그려요.
-// =====================================================
-
-let FROSTL = null;          // 다 자란 성에를 모아 둔 레이어
-let frostDirty = true;      // 다시 구워야 하는지
-let EDGEF = null;           // 두 손가락으로 누를 때 화면 가장자리에 서리는 성에
-let iceTex = null;          // 얼음 질감 패턴
+let FROSTL = null;
+let frostDirty = true;
+let EDGEF = null;
+let iceTex = null;
 
 function markFrostDirty() { frostDirty = true; }
 
-// ---------- 얼음 질감 (이어 붙여도 티 안 나는 타일) ----------
 function getIcePattern() {
   if (iceTex) return iceTex;
   const S = 192;
@@ -23,7 +14,7 @@ function getIcePattern() {
   x.fillStyle = "rgba(226,240,255,0.62)";
   x.fillRect(0, 0, S, S);
   const rnd = U.rng(4242);
-  // 잔 알갱이
+
   const img = x.getImageData(0, 0, S, S);
   for (let i = 0; i < S * S; i++) {
     const v = rnd();
@@ -33,7 +24,7 @@ function getIcePattern() {
     }
   }
   x.putImageData(img, 0, 0);
-  // 결정 무늬 선과 얼룩 (가장자리에서 반대편으로 이어지게 9번 그림)
+
   const wrap = (fn) => { for (let ox = -S; ox <= S; ox += S) for (let oy = -S; oy <= S; oy += S) fn(ox, oy); };
   for (let i = 0; i < 70; i++) {
     const px = rnd() * S, py = rnd() * S, a = rnd() * TAU, l = 8 + rnd() * 26;
@@ -60,23 +51,19 @@ function getIcePattern() {
   return iceTex;
 }
 
-// ---------- 글씨 위에 맺히는 아주 작은 얼음 가시 ----------
-// 성에가 "글씨 자체"를 얼리는 느낌이 나도록, 결정은 가장자리에 짧고 드문 가시로만 남겼어요.
-// d[0] 에 [시작x, 시작y, 끝x, 끝y, 자라기 시작하는 시각(ms), 자라는 데 걸리는 시간(ms)] 를 쌓아요
 function addBranch(st, x, y, ang, len, depth, delay, rnd) {
   const dur = 160 + len * 7;
   st.d[depth].push(x, y, x + Math.cos(ang) * len, y + Math.sin(ang) * len, delay, dur);
   if (delay + dur > st.end) st.end = delay + dur;
 }
 
-const FROST_SWEEP_MS = 1200;   // 얼음이 글씨를 따라 번져 가는 시간
-const FROST_SPUR_CHANCE = 0; // 가장자리 가시가 생길 확률 (0 = 가시 없이 글씨만 얼어붙음)
+const FROST_SWEEP_MS = 1200;
+const FROST_SPUR_CHANCE = 0;
 
-// 획 하나에 대한 성에 데이터 (창 크기가 같으면 캐시를 재사용)
 function frostFor(s) {
   const key = VW + "x" + VH;
   if (s.kind === "text") {
-    // 글 메모는 가시 없이, 글자를 하나씩 덮으며 얼어붙습니다
+
     if (s._fc && s._fc.key === key) return s._fc;
     layoutText(s);
     s._fc = { d: [[], [], []], end: FROST_SWEEP_MS + 120, key: key,
@@ -110,7 +97,7 @@ function frostFor(s) {
       addBranch(st, ox, oy, ang, len, 0, (cum[i] / total) * FROST_SWEEP_MS + rnd() * 150, rnd);
     }
   }
-  // 반짝임 위치 (글씨 위에 몇 개만)
+
   const spN = U.clamp(Math.round(total / 90), 2, 10);
   for (let k = 0; k < spN; k++) {
     const i = Math.min(n - 1, Math.floor(rnd() * n));
@@ -120,7 +107,6 @@ function frostFor(s) {
   return st;
 }
 
-// 얼음 가시 그리기 (푸른 회색 그림자 → 흰 선)
 function drawFronds(ctx, st, t, alphaMul) {
   const arr = st.d[0];
   if (!arr.length) return;
@@ -140,12 +126,8 @@ function drawFronds(ctx, st, t, alphaMul) {
   }
 }
 
-// 글씨가 통째로 얼어붙은 모습.
-// 획마다 따로 반투명하게 덮으면 획이 겹치는 곳이 두 겹으로 보이기 때문에,
-// "모든 획을 한꺼번에 합친 모양(합집합)" 으로 먼저 만든 다음 딱 한 번만 얼음 질감을 입혀요.
-//   1) 푸른 윤곽  2) 서리 질감  3) 안쪽의 하얀 결  (세 번 모두 합집합으로 처리)
-let ICEB = null;   // 얼음 덩어리를 완성해서 담는 레이어
-let ICET = null;   // 합집합을 만드는 임시 레이어
+let ICEB = null;
+let ICET = null;
 
 function unionPass(ctx, list, k, add, color) {
   ctx.globalCompositeOperation = "source-over";
@@ -156,7 +138,7 @@ function unionPass(ctx, list, k, add, color) {
   ctx.fillStyle = color;
   for (const it of list) {
     if (it.s.kind === "text") { ctx.setLineDash([]); memoTextUnion(ctx, it.s, k, add, it.p); continue; }
-    ctx.setLineDash(it.p < 1 ? [it.len * it.p + 0.01, it.len * 2 + 100] : []);   // 글씨를 따라 번져 가는 효과
+    ctx.setLineDash(it.p < 1 ? [it.len * it.p + 0.01, it.len * 2 + 100] : []);
     tracePts(ctx, it.s.pts, VW, VH);
     ctx.lineWidth = it.s.w * k + add;
     ctx.stroke();
@@ -177,23 +159,21 @@ function renderBands(now) {
   B.clearRect(0, 0, VW, VH);
   if (!list.length) return;
 
-  unionPass(T, list, 1, 3, "#7096cd");                    // 푸른 윤곽
+  unionPass(T, list, 1, 3, "#7096cd");
   B.globalAlpha = 0.34; B.drawImage(ICET.c, 0, 0, VW, VH);
 
-  unionPass(T, list, 1, 0, "#ffffff");                    // 서리 질감 (합집합 모양 안에만)
+  unionPass(T, list, 1, 0, "#ffffff");
   T.globalCompositeOperation = "source-in";
   T.fillStyle = getIcePattern();
   T.fillRect(0, 0, VW, VH);
   T.globalCompositeOperation = "source-over";
   B.globalAlpha = 0.9; B.drawImage(ICET.c, 0, 0, VW, VH);
 
-  unionPass(T, list, 0.45, 0, "#ffffff");                 // 안쪽의 하얀 결
+  unionPass(T, list, 0.45, 0, "#ffffff");
   B.globalAlpha = 0.38; B.drawImage(ICET.c, 0, 0, VW, VH);
   B.globalAlpha = 1;
 }
 
-// ---------- 레이어 관리 ----------
-// 얼음 덩어리(ICEB)는 새로 얼거나 번지는 중일 때만 다시 만들고, 가시와 반짝임은 따로 그려요.
 function frostGrown(s, now) {
   return now - (s.frostT0 || 0) >= frostFor(s).end + 80;
 }
@@ -228,7 +208,7 @@ function drawFrost(ctx, now) {
     if (!s.frozen || (s.kind !== "wipe" && s.kind !== "text")) continue;
     const st = frostFor(s);
     if (!s.baked) drawFronds(ctx, st, now - s.frostT0, 1);
-    // 반짝임
+
     const sp = st.sp;
     for (let i = 0; i < sp.length; i += 3) {
       const tw = Math.pow(0.5 + 0.5 * Math.sin(now * 0.0026 + sp[i + 2] * 3), 4);
@@ -244,7 +224,6 @@ function drawFrost(ctx, now) {
   }
 }
 
-// ---------- 두 손가락으로 누르는 동안 가장자리부터 서리는 얼음 (결정 없이 부드러운 서리만) ----------
 function buildEdgeFrost() { EDGEF = true; }
 
 function drawEdgeFrost(ctx, p) {

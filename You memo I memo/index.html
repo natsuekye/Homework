@@ -2,11 +2,10 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <!-- 모바일 필수: 폰에서 PC용 화면처럼 축소되는 것 방지 -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>You memo? I memo!</title>
 
-    <!-- p5.js: 여기서는 캔버스 생성과 draw 루프만 사용합니다 (1.x / 2.x 모두 동작) -->
     <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
 
     <style>
@@ -18,7 +17,7 @@
         background-color: #1e2832;
         font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
       }
-      /* 터치 필수: 브라우저가 스크롤/확대 대신 코드에 터치를 넘기도록 함 */
+
       body {
         touch-action: none;
         overscroll-behavior: none;
@@ -29,7 +28,6 @@
       }
       canvas { display: block; touch-action: none; }
 
-      /* 안내 문구 (유리에 맺힌 글씨 같은 느낌) */
       #hint {
         position: fixed; left: 50%; bottom: calc(14vh + 12px);
         transform: translateX(-50%) translateY(6px);
@@ -45,7 +43,6 @@
       }
       #hint.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-      /* 글씨 크기 버튼 : 누를 때마다 작게 → 보통 → 크게 */
       #sizeBtn {
         position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 12px;
         width: 34px; height: 34px; padding: 0; box-sizing: border-box;
@@ -61,7 +58,6 @@
         transition: width 0.16s ease, height 0.16s ease;
       }
 
-      /* Aa 버튼 : 자판 입력 */
       #typeBtn {
         position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 54px;
         height: 34px; padding: 0 16px; box-sizing: border-box;
@@ -72,16 +68,14 @@
         cursor: pointer; z-index: 6; touch-action: manipulation;
       }
 
-      /* 키보드를 올리기 위한, 보이지 않는 입력칸 */
       #typer {
         position: fixed; left: 0; bottom: 0; width: 1px; height: 1px;
         opacity: 0.01; border: 0; padding: 0; margin: 0; resize: none;
         background: transparent; color: transparent; caret-color: transparent;
-        font-size: 16px; /* 16px 보다 작으면 아이폰에서 화면이 확대돼요 */
+        font-size: 16px;
         z-index: 0;
       }
 
-      /* 도움말 버튼 */
       #helpBtn {
         position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 12px;
         width: 34px; height: 34px; border-radius: 50%;
@@ -105,7 +99,7 @@
       #helpPanel.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
       #helpPanel b { color: #cfe8ff; font-weight: 600; }
       #helpPanel .row { margin: 0 0 8px; }
-      /* 모두 지우기 : ? 버튼 왼쪽 */
+
       #resetBtn {
         position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 54px;
         height: 34px; padding: 0 14px; box-sizing: border-box;
@@ -121,7 +115,7 @@
   </head>
   <body>
     <script>
-      // iOS Safari: 스크롤 / 핀치 확대 / 더블탭 확대를 스크립트로 한 번 더 차단
+
       document.addEventListener("touchmove", function (e) {
         e.preventDefault();
       }, { passive: false });
@@ -148,7 +142,6 @@
       <p class="pc">PC : Shift를 누른 채 마우스를 쓰면 두 손가락 동작이 돼요.</p>
     </div>
 
-    <!-- 불러오는 순서가 중요합니다 (위에서부터 차례로) -->
     <script src="util.js"></script>
     <script src="scene.js"></script>
     <script src="dropgfx.js"></script>
