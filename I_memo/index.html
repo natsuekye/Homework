@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- 모바일 필수: 폰에서 PC용 화면처럼 축소되는 것 방지 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>You memo? I memo!</title>
+
+    <!-- p5.js: 여기서는 캔버스 생성과 draw 루프만 사용합니다 (1.x / 2.x 모두 동작) -->
+    <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
+
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: #1e2832;
+        font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+      }
+      /* 터치 필수: 브라우저가 스크롤/확대 대신 코드에 터치를 넘기도록 함 */
+      body {
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas { display: block; touch-action: none; }
+
+      /* 안내 문구 (유리에 맺힌 글씨 같은 느낌) */
+      #hint {
+        position: fixed; left: 50%; bottom: calc(14vh + 12px);
+        transform: translateX(-50%) translateY(6px);
+        max-width: 86vw; padding: 9px 16px;
+        border-radius: 999px;
+        background: rgba(20, 30, 42, 0.38);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 14px; letter-spacing: 0.01em; text-align: center;
+        opacity: 0; pointer-events: none;
+        transition: opacity .6s ease, transform .6s ease;
+        z-index: 5;
+      }
+      #hint.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+      /* 글씨 크기 버튼 : 누를 때마다 작게 → 보통 → 크게 */
+      #sizeBtn {
+        position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 12px;
+        width: 34px; height: 34px; padding: 0; box-sizing: border-box;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(20, 30, 42, 0.32);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        cursor: pointer; z-index: 6; touch-action: manipulation;
+      }
+      #sizeDot {
+        display: block; width: 14px; height: 14px; border-radius: 50%;
+        background: rgba(255, 255, 255, 0.95);
+        transition: width 0.16s ease, height 0.16s ease;
+      }
+
+      /* Aa 버튼 : 자판 입력 */
+      #typeBtn {
+        position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 54px;
+        height: 34px; padding: 0 16px; box-sizing: border-box;
+        border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(20, 30, 42, 0.32);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        color: rgba(255, 255, 255, 0.92); font: inherit; font-size: 14px; line-height: 32px;
+        cursor: pointer; z-index: 6; touch-action: manipulation;
+      }
+
+      /* 키보드를 올리기 위한, 보이지 않는 입력칸 */
+      #typer {
+        position: fixed; left: 0; bottom: 0; width: 1px; height: 1px;
+        opacity: 0.01; border: 0; padding: 0; margin: 0; resize: none;
+        background: transparent; color: transparent; caret-color: transparent;
+        font-size: 16px; /* 16px 보다 작으면 아이폰에서 화면이 확대돼요 */
+        z-index: 0;
+      }
+
+      /* 도움말 버튼 */
+      #helpBtn {
+        position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 12px;
+        width: 34px; height: 34px; border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(20, 30, 42, 0.32);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        color: rgba(255, 255, 255, 0.9); font-size: 16px; line-height: 32px; text-align: center;
+        padding: 0; cursor: pointer; z-index: 6; touch-action: manipulation;
+      }
+      #helpPanel {
+        position: fixed; top: calc(env(safe-area-inset-top, 0px) + 54px); right: 12px;
+        width: min(300px, 82vw); padding: 16px 18px;
+        border-radius: 18px;
+        background: rgba(18, 26, 38, 0.62);
+        -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        color: rgba(255, 255, 255, 0.92); font-size: 13.5px; line-height: 1.6;
+        opacity: 0; pointer-events: none; transform: translateY(-6px);
+        transition: opacity .35s ease, transform .35s ease; z-index: 6;
+      }
+      #helpPanel.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+      #helpPanel b { color: #cfe8ff; font-weight: 600; }
+      #helpPanel .row { margin: 0 0 8px; }
+      /* 모두 지우기 : ? 버튼 왼쪽 */
+      #resetBtn {
+        position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 54px;
+        height: 34px; padding: 0 14px; box-sizing: border-box;
+        border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(20, 30, 42, 0.32);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        color: rgba(255, 255, 255, 0.9); font: inherit; font-size: 13px; line-height: 32px; white-space: nowrap;
+        cursor: pointer; z-index: 6; touch-action: manipulation;
+      }
+      #resetBtn.armed { background: rgba(214, 70, 70, 0.6); border-color: rgba(255, 190, 190, 0.8); }
+      #helpPanel .pc { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.15); opacity: .75; font-size: 12.5px; }
+    </style>
+  </head>
+  <body>
+    <script>
+      // iOS Safari: 스크롤 / 핀치 확대 / 더블탭 확대를 스크립트로 한 번 더 차단
+      document.addEventListener("touchmove", function (e) {
+        e.preventDefault();
+      }, { passive: false });
+      ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+        document.addEventListener(t, function (e) { e.preventDefault(); });
+      });
+    </script>
+
+    <div id="hint"></div>
+    <button id="sizeBtn" aria-label="글씨 크기"><i id="sizeDot"></i></button>
+    <textarea id="typer" rows="1" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+    <button id="typeBtn" aria-label="자판으로 쓰기">Aa</button>
+    <button id="resetBtn" title="창틀에 보관된 물방울은 지워지지 않아요">모두 지우기</button>
+    <button id="helpBtn" aria-label="도움말">?</button>
+    <div id="helpPanel">
+      <p class="row"><b>한 손가락으로 문지르기</b><br />김이 닦이며 글씨·그림이 써져요</p>
+      <p class="row"><b>빈 곳을 두 번 톡</b> (또는 <b>Aa</b>)<br />자판이 올라와요. 길게 적을 때 쓰세요<br />빈 곳을 한 번 톡 하면 끝나요</p>
+      <p class="row"><b>한 곳을 1초 꾹</b><br />입김이 번져서 주변 메모가 지워져요</p>
+      <p class="row"><b>두 손가락으로 1초 꾹</b><br />메모가 성에로 얼어붙어 남아요</p>
+      <p class="row"><b>두 손가락으로 아래로 쓸기</b><br />메모가 물방울이 되어 창틀로 흘러내려요</p>
+      <p class="row"><b>창틀의 물방울 톡</b><br />크게 펼쳐서 보기 (다시 톡 : 닫기, 1초 꾹 : 증발)<br />물방울 오른쪽 위의 <b>×</b> : 그 물방울만 삭제</p>
+      <p class="row"><b>왼쪽 위 ● 버튼</b><br />누를 때마다 작게 → 보통 → 크게</p>
+      <p class="row"><b>창밖 하늘</b><br />지금 시각에 맞춰 저절로 바뀌어요</p>
+      <p class="pc">PC : Shift를 누른 채 마우스를 쓰면 두 손가락 동작이 돼요.</p>
+    </div>
+
+    <!-- 불러오는 순서가 중요합니다 (위에서부터 차례로) -->
+    <script src="util.js"></script>
+    <script src="scene.js"></script>
+    <script src="dropgfx.js"></script>
+    <script src="fog.js"></script>
+    <script src="memo.js"></script>
+    <script src="frost.js"></script>
+    <script src="drops.js"></script>
+    <script src="text.js"></script>
+    <script src="gestures.js"></script>
+    <script src="sketch.js"></script>
+  </body>
+</html>
