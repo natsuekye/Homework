@@ -553,13 +553,13 @@ function drawTextScaled(ctx, t, s, ice) {
     ctx.translate(x * s, y * s);
     ctx.rotate(rot);
     if (ice) {
-      ctx.strokeStyle = "rgba(142,184,236,0.6)";
-      ctx.lineWidth = Math.max(2, px * 0.4);
+      ctx.strokeStyle = "rgba(118,164,224,0.62)";
+      ctx.lineWidth = Math.max(1.8, px * 0.3);
       ctx.strokeText(c, 0, 0);
-      ctx.strokeStyle = "rgba(236,247,255,0.95)";
-      ctx.lineWidth = Math.max(1.2, px * 0.17);
+      ctx.strokeStyle = "rgba(226,243,255,0.9)";
+      ctx.lineWidth = Math.max(1, px * 0.09);
       ctx.strokeText(c, 0, 0);
-      ctx.fillStyle = "rgba(246,252,255,0.98)";
+      ctx.fillStyle = "rgba(255,255,255,0.99)";
       ctx.fillText(c, 0, 0);
     } else {
       ctx.strokeStyle = "rgba(255,255,255,0.3)";
