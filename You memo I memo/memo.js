@@ -1,3 +1,4 @@
+
 const FOG_RETURN_MS = 120000;
 const STORE_KEY = "imemo.v1";
 
@@ -8,8 +9,8 @@ const MEMO = {
 
 const BREATHS = [];
 
-const BRUSH_STEPS = [12, 20, 32];
-const BRUSH_DOTS = [8, 14, 20];
+const BRUSH_STEPS = [8, 16, 32];
+const BRUSH_DOTS = [6, 12, 20];
 const BRUSH_KEY = "imemo.brushStep";
 let brushStep = null;
 
@@ -19,7 +20,6 @@ function wipeWidth() {
     try { v = parseInt(localStorage.getItem(BRUSH_KEY), 10); } catch (e) {}
     brushStep = isNaN(v) ? 1 : U.clamp(v, 0, BRUSH_STEPS.length - 1);
   }
-
   const k = U.clamp(Math.min(VW, VH) / 700, 0.8, 1.5);
   return BRUSH_STEPS[brushStep] * k;
 }
@@ -42,15 +42,51 @@ function newStroke(xPx, yPx) {
   return s;
 }
 
-function extendStroke(s, xPx, yPx) {
+function pushTo(s, x, y) {
   const n = s.pts.length;
   const lx = s.pts[n - 2] * VW, ly = s.pts[n - 1] * VH;
-  const dx = xPx - lx, dy = yPx - ly, d = Math.hypot(dx, dy);
-  if (d < 2.5) return;
+  const dx = x - lx, dy = y - ly, d = Math.hypot(dx, dy);
+  if (d < 0.5) return;
   const steps = Math.ceil(d / 5);
   for (let i = 1; i <= steps; i++) {
     s.pts.push((lx + (dx * i) / steps) / VW, (ly + (dy * i) / steps) / VH);
   }
+}
+
+function pushQuadTo(s, cx, cy, x, y) {
+  const n = s.pts.length;
+  const sx = s.pts[n - 2] * VW, sy = s.pts[n - 1] * VH;
+  const d = Math.hypot(cx - sx, cy - sy) + Math.hypot(x - cx, y - cy);
+  const steps = Math.max(1, Math.ceil(d / 5));
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps, u = 1 - t;
+    const px = u * u * sx + 2 * u * t * cx + t * t * x;
+    const py = u * u * sy + 2 * u * t * cy + t * t * y;
+    s.pts.push(px / VW, py / VH);
+  }
+}
+
+function extendStroke(s, xPx, yPx) {
+  if (!s.raw) s.raw = [s.pts[0] * VW, s.pts[1] * VH];
+  const r = s.raw;
+  if (Math.hypot(xPx - r[r.length - 2], yPx - r[r.length - 1]) < 2.5) return;
+  r.push(xPx, yPx);
+
+  const m = r.length;
+  if (m === 4) {
+    pushTo(s, (r[0] + r[2]) / 2, (r[1] + r[3]) / 2);
+  } else {
+    pushQuadTo(s, r[m - 4], r[m - 3], (r[m - 4] + r[m - 2]) / 2, (r[m - 3] + r[m - 1]) / 2);
+  }
+  if (m > 40) r.splice(0, m - 6);
+}
+
+function finishStroke(s) {
+  if (!s || !s.raw) return;
+  const r = s.raw;
+  if (r.length >= 4) pushTo(s, r[r.length - 2], r[r.length - 1]);
+  s.raw = null;
+  scheduleSave();
 }
 
 function strokeLook(s, wall) {
@@ -124,11 +160,15 @@ function startBreath(x, y, R, trim) {
 function trimStrokes(cx, cy, rr) {
   const out = [];
   const r2 = rr * rr;
+  let stopEdit = false;
   for (const s of MEMO.strokes) {
     if (s.frozen || s.kind === "ambient") { out.push(s); continue; }
     if (s.kind === "text") {
-
       if (!trimText(s, cx, cy, rr).empty) out.push(s);
+      else {
+        if (TEXT.editing === s) stopEdit = true;
+        if (TEXT.selected === s) TEXT.selected = null;
+      }
       continue;
     }
     const p = s.pts, runs = [];
@@ -147,6 +187,8 @@ function trimStrokes(cx, cy, rr) {
     }
   }
   MEMO.strokes = out;
+  if (stopEdit) stopTyping();
+  scheduleSave();
 }
 
 function updateBreaths(now) {
@@ -186,32 +228,60 @@ function drawBlooms(ctx, now) {
   }
 }
 
-function freezeAll() {
+function frostRadius() {
+  return breathRadius() * 0.72;
+}
+
+function freezeNear(cx, cy, rr) {
   let n = 0;
   const now = performance.now();
+  const r2 = rr * rr;
   for (const s of MEMO.strokes) {
-    if ((s.kind === "wipe" || s.kind === "text") && !s.frozen) {
-      s.frozen = true; s.frostT0 = now; n++;
-    }
+    if (s.frozen) continue;
+
+    if (s.kind === "text") {
+      const r = textBoxRect(s);
+      const dx = Math.max(r.x - cx, 0, cx - (r.x + r.w));
+      const dy = Math.max(r.y - cy, 0, cy - (r.y + r.h));
+      if (dx * dx + dy * dy > r2) continue;
+    } else if (s.kind === "wipe") {
+      let hit = false;
+      for (let i = 0; i < s.pts.length; i += 2) {
+        const px = s.pts[i] * VW - cx, py = s.pts[i + 1] * VH - cy;
+        if (px * px + py * py < r2) { hit = true; break; }
+      }
+      if (!hit) continue;
+    } else continue;
+
+    s.frozen = true; s.frostT0 = now; n++;
   }
-  if (n) saveState();
+  if (n) {
+    if (TEXT.editing && TEXT.editing.frozen) stopTyping();
+    if (TEXT.selected && TEXT.selected.frozen) TEXT.selected = null;
+    markFrostDirty();
+    saveState();
+  }
   return n;
+}
+
+let saveTimer = null;
+function scheduleSave() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => { saveTimer = null; saveState(); }, 600);
 }
 
 function saveState() {
   try {
     const r = (v) => Math.round(v * 5000) / 5000;
     const frozen = MEMO.strokes
-      .filter((s) => s.frozen && s.kind === "wipe")
-      .map((s) => ({ pts: s.pts.map(r), w: s.w, ts: s.t0, seed: s.seed }));
-
+      .filter((s) => s.kind === "wipe")
+      .map((s) => ({ pts: s.pts.map(r), w: s.w, ts: s.t0, seed: s.seed, fz: s.frozen ? 1 : 0 }));
     const texts = MEMO.strokes
-      .filter((s) => s.frozen && s.kind === "text")
-      .map((t) => ({ str: t.str, x: r(t.x), y: r(t.y), sizeR: t.sizeR, wrapR: t.wrapR, gone: t.gone, ts: t.t0, seed: t.seed }));
-
+      .filter((s) => s.kind === "text")
+      .map((t) => ({ str: t.str, x: r(t.x), y: r(t.y), sizeR: t.sizeR, wrapR: t.wrapR, gone: t.gone, ts: t.t0, seed: t.seed, fz: t.frozen ? 1 : 0 }));
     const clean = (st) => st.text
-      ? { text: 1, str: st.str, x: st.x, y: st.y, sizeR: st.sizeR, wrapR: st.wrapR, gone: st.gone, seed: st.seed }
-      : { pts: st.pts, w: st.w };
+      ? { text: 1, ice: !!st.ice, str: st.str, x: st.x, y: st.y, sizeR: st.sizeR, wrapR: st.wrapR, gone: st.gone, seed: st.seed }
+      : { ice: !!st.ice, pts: st.pts, w: st.w };
     const archive = DROPS.archive.map((m) => ({ id: m.id, ts: m.ts, ice: m.ice, strokes: m.strokes.map(clean) }));
     localStorage.setItem(STORE_KEY, JSON.stringify({ frozen: frozen, texts: texts, archive: archive }));
   } catch (e) {  }
@@ -225,14 +295,16 @@ function loadState() {
     for (const f of d.frozen || []) {
       MEMO.strokes.push({
         id: MEMO.nextId++, kind: "wipe", pts: f.pts, w: f.w, t0: f.ts || Date.now(),
-        lifeMs: FOG_RETURN_MS, frozen: true, seed: f.seed || 1, frostT0: -1e9,
+        lifeMs: FOG_RETURN_MS, frozen: f.fz === undefined ? true : !!f.fz,
+        seed: f.seed || 1, frostT0: -1e9,
       });
     }
     for (const x of d.texts || []) {
       MEMO.strokes.push({
         id: MEMO.nextId++, kind: "text", str: x.str || "", x: x.x, y: x.y,
         sizeR: x.sizeR, wrapR: x.wrapR, gone: x.gone || [], t0: x.ts || Date.now(),
-        lifeMs: FOG_RETURN_MS, frozen: true, seed: x.seed || 1, frostT0: -1e9,
+        lifeMs: FOG_RETURN_MS, frozen: x.fz === undefined ? true : !!x.fz,
+        seed: x.seed || 1, frostT0: -1e9,
       });
     }
     DROPS.archive = d.archive || [];
@@ -240,6 +312,7 @@ function loadState() {
 }
 
 function resetAll() {
+  if (isTyping()) stopTyping();
   MEMO.strokes = [];
   markFrostDirty();
   saveState();

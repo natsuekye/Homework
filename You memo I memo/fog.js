@@ -1,3 +1,4 @@
+
 let FOGB = null;
 let AMBIENT = [];
 
@@ -50,7 +51,7 @@ function buildFog(S) {
   x.globalAlpha = 1;
 
   const rnd = U.rng(909);
-  const N = Math.floor((VW * VH) / 280);
+  const N = Math.floor((VW * VH) / 560);
   const px = new Float32Array(N), py = new Float32Array(N), pr = new Float32Array(N);
   const centers = [];
   for (let i = 0; i < 9; i++) centers.push([rnd() * VW, rnd() * VH, 60 + rnd() * 160]);
@@ -78,9 +79,9 @@ function buildFog(S) {
   pass("rgba(255,255,255,0.1)", 0, 0, 1);
   pass("rgba(255,255,255," + (0.5 - 0.15 * S.dark) + ")", -0.3, -0.35, 0.45);
 
-  const M = U.clamp(Math.floor((VW * VH) / 11000), 45, 220);
+  const M = U.clamp(Math.floor((VW * VH) / 44000), 11, 55);
   for (let i = 0; i < M; i++) {
-    paintDrop(x, rnd() * VW, rnd() * VH * 0.92, 2.4 + Math.pow(rnd(), 2) * 5, { spread: 3, shadow: true });
+    paintDrop(x, rnd() * VW, rnd() * VH * 0.92, 1.8 + Math.pow(rnd(), 2) * 3.2, { spread: 3, shadow: true });
   }
 
   genAmbient();

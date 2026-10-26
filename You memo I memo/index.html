@@ -2,13 +2,26 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>You memo? I memo!</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap"
+      rel="stylesheet"
+    />
 
     <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
 
     <style>
+      @font-face {
+        font-family: 'Hippie';
+        src: url('https://cdn.jsdelivr.net/gh/Project-Noonnu/2610081905@hippie/hippie/hippie_히피체.woff2') format('woff2');
+        font-weight: 400;
+        font-display: swap;
+      }
+
       html, body {
         height: 100%;
         margin: 0;
@@ -17,7 +30,6 @@
         background-color: #1e2832;
         font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
       }
-
       body {
         touch-action: none;
         overscroll-behavior: none;
@@ -58,9 +70,14 @@
         transition: width 0.16s ease, height 0.16s ease;
       }
 
+      #typeBtn.on {
+        background: rgba(255, 255, 255, 0.88);
+        color: #16202c;
+        border-color: rgba(255, 255, 255, 0.9);
+      }
       #typeBtn {
         position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 54px;
-        height: 34px; padding: 0 16px; box-sizing: border-box;
+        height: 34px; padding: 0 10px; box-sizing: border-box;
         border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.35);
         background: rgba(20, 30, 42, 0.32);
         -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
@@ -85,6 +102,12 @@
         color: rgba(255, 255, 255, 0.9); font-size: 16px; line-height: 32px; text-align: center;
         padding: 0; cursor: pointer; z-index: 6; touch-action: manipulation;
       }
+      #sizeBtn, #typeBtn, #resetBtn, #helpBtn { transition: opacity 0.22s ease; }
+      body.viewing #sizeBtn,
+      body.viewing #typeBtn,
+      body.viewing #resetBtn,
+      body.viewing #helpBtn { opacity: 0; pointer-events: none; }
+
       #helpPanel {
         position: fixed; top: calc(env(safe-area-inset-top, 0px) + 54px); right: 12px;
         width: min(300px, 82vw); padding: 16px 18px;
@@ -98,8 +121,9 @@
       }
       #helpPanel.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
       #helpPanel b { color: #cfe8ff; font-weight: 600; }
-      #helpPanel .row { margin: 0 0 8px; }
-
+      #helpPanel .row { margin: 0 0 10px; }
+      #helpPanel .row:last-child { margin-bottom: 0; }
+      #helpPanel .pc { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.15); opacity: .72; font-size: 12.5px; }
       #resetBtn {
         position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 54px;
         height: 34px; padding: 0 14px; box-sizing: border-box;
@@ -109,36 +133,29 @@
         color: rgba(255, 255, 255, 0.9); font: inherit; font-size: 13px; line-height: 32px; white-space: nowrap;
         cursor: pointer; z-index: 6; touch-action: manipulation;
       }
-      #resetBtn.armed { background: rgba(214, 70, 70, 0.6); border-color: rgba(255, 190, 190, 0.8); }
-      #helpPanel .pc { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.15); opacity: .75; font-size: 12.5px; }
     </style>
   </head>
   <body>
     <script>
-
       document.addEventListener("touchmove", function (e) {
         e.preventDefault();
       }, { passive: false });
       ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
         document.addEventListener(t, function (e) { e.preventDefault(); });
       });
-    </script>
+</script>
 
     <div id="hint"></div>
-    <button id="sizeBtn" aria-label="글씨 크기"><i id="sizeDot"></i></button>
+    <button id="sizeBtn" aria-label="선 굵기"><i id="sizeDot"></i></button>
     <textarea id="typer" rows="1" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
     <button id="typeBtn" aria-label="자판으로 쓰기">Aa</button>
     <button id="resetBtn" title="창틀에 보관된 물방울은 지워지지 않아요">모두 지우기</button>
     <button id="helpBtn" aria-label="도움말">?</button>
     <div id="helpPanel">
       <p class="row"><b>한 손가락으로 문지르기</b><br />김이 닦이며 글씨·그림이 써져요</p>
-      <p class="row"><b>빈 곳을 두 번 톡</b> (또는 <b>Aa</b>)<br />자판이 올라와요. 길게 적을 때 쓰세요<br />빈 곳을 한 번 톡 하면 끝나요</p>
-      <p class="row"><b>한 곳을 1초 꾹</b><br />입김이 번져서 주변 메모가 지워져요</p>
-      <p class="row"><b>두 손가락으로 1초 꾹</b><br />메모가 성에로 얼어붙어 남아요</p>
+      <p class="row"><b>한 곳을 꾹</b><br />입김이 번져서 주변 메모가 지워져요</p>
+      <p class="row"><b>두 손가락으로 꾹</b><br />누른 자리 주위의 메모만 성에로 얼어붙어요</p>
       <p class="row"><b>두 손가락으로 아래로 쓸기</b><br />메모가 물방울이 되어 창틀로 흘러내려요</p>
-      <p class="row"><b>창틀의 물방울 톡</b><br />크게 펼쳐서 보기 (다시 톡 : 닫기, 1초 꾹 : 증발)<br />물방울 오른쪽 위의 <b>×</b> : 그 물방울만 삭제</p>
-      <p class="row"><b>왼쪽 위 ● 버튼</b><br />누를 때마다 작게 → 보통 → 크게</p>
-      <p class="row"><b>창밖 하늘</b><br />지금 시각에 맞춰 저절로 바뀌어요</p>
       <p class="pc">PC : Shift를 누른 채 마우스를 쓰면 두 손가락 동작이 돼요.</p>
     </div>
 

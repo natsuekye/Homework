@@ -1,15 +1,15 @@
+
 const HOLD_MS = 1000;
 const TAP_MS = 450;
 const MOVE_TOL = 8;
 const SWIPE_DOWN_PX = 90;
+const FROST_HOLD_MS = 700;
 
-const G = { ptrs: new Map(), mode: "idle", single: null, dbl: null, openHold: null };
-
+const G = { ptrs: new Map(), mode: "idle", single: null, dbl: null, openHold: null, drawing: null };
 const DBLTAP_MS = 330;
 const TAPQ = { t: 0, x: 0, y: 0, timer: null };
 function cancelDot() { if (TAPQ.timer) { clearTimeout(TAPQ.timer); TAPQ.timer = null; } }
-
-const CUE = { breathP: 0, bx: 0, by: 0, br: 0, frostP: 0 };
+const CUE = { breathP: 0, bx: 0, by: 0, br: 0, frostP: 0, fx: 0, fy: 0, fr: 0 };
 
 function centroid() {
   let x = 0, y = 0, n = 0;
@@ -32,32 +32,54 @@ function onDown(e) {
   try { e.target.setPointerCapture(e.pointerId); } catch (err) {}
   const now = performance.now();
   G.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
   if (e.pointerType === "mouse" && e.shiftKey && !G.ptrs.has("v")) {
     G.ptrs.set("v", { x: e.clientX + 36, y: e.clientY + 10 });
   }
 
   if (G.mode === "idle") {
+    if (!DROPS.open && G.ptrs.size >= 2) {
+      beginDouble(now);
+      return;
+    }
 
-    if (isTyping()) {
-      stopTyping();
+    if (activeText() && textHandleAt(e.clientX, e.clientY)) {
+      beginTextDrag("size", e.clientX, e.clientY, activeText());
+      G.mode = "single";
+      G.single = { id: e.pointerId, sx: e.clientX, sy: e.clientY, t0: now,
+        moved: true, fired: true, stroke: null, handle: "size", icon: null, drop: null, textHit: null };
+      return;
+    }
+
+    const onText = textMemoAt(e.clientX, e.clientY);
+    if (onText) {
+      G.mode = "single";
+      G.single = { id: e.pointerId, sx: e.clientX, sy: e.clientY, t0: now,
+        moved: false, fired: false, stroke: null, handle: null, icon: null, drop: null, textHit: onText };
+      return;
+    }
+
+    if (isTyping() || TEXT.selected) {
+      clearTextSelection();
       G.mode = "consumed";
       return;
     }
     if (DROPS.open) {
       G.mode = "open";
-      G.openHold = { t0: now, fired: false, moved: false, sx: e.clientX, sy: e.clientY };
-    } else if (G.ptrs.size >= 2) {
-      beginDouble(now);
+      G.openHold = { t0: now, sx: e.clientX, sy: e.clientY };
     } else {
       G.mode = "single";
-      G.single = { id: e.pointerId, sx: e.clientX, sy: e.clientY, t0: now, moved: false, fired: false, stroke: null, icon: hitDropIcon(e.clientX, e.clientY), drop: null };
+      G.single = { id: e.pointerId, sx: e.clientX, sy: e.clientY, t0: now, moved: false, fired: false,
+        stroke: null, handle: null, icon: hitDropIcon(e.clientX, e.clientY), drop: null, textHit: null };
       if (!G.single.icon) G.single.drop = hitDrop(e.clientX, e.clientY);
     }
   } else if (G.mode === "single") {
-
-    if (G.single.moved) G.mode = "consumed";
-    else beginDouble(now);
+    const s = G.single;
+    if (s.stroke || (s.textHit && s.moved)) {
+      G.mode = "consumed";
+    } else {
+      if (s.handle) endTextDrag();
+      beginDouble(now);
+    }
   }
 }
 
@@ -76,14 +98,25 @@ function onMove(e) {
 
   if (G.mode === "single" && G.single && e.pointerId === G.single.id) {
     const s = G.single;
+    if (s.handle) { moveTextDrag(p.x, p.y); return; }
+    if (s.textHit) {
+      if (!s.moved && Math.hypot(p.x - s.sx, p.y - s.sy) > MOVE_TOL) {
+        s.moved = true;
+        selectText(s.textHit);
+        beginTextDrag("move", s.sx, s.sy, s.textHit);
+      }
+      if (s.moved) moveTextDrag(p.x, p.y);
+      return;
+    }
     if (!s.moved && Math.hypot(p.x - s.sx, p.y - s.sy) > MOVE_TOL) {
       s.moved = true;
       cancelDot();
+      if (isPlacing()) cancelPlacing();
       s.stroke = newStroke(s.sx, writeY(s.sy));
+      G.drawing = s.stroke;
       hideIntroHint();
     }
     if (s.moved && s.stroke) {
-
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
       if (evs && evs.length) for (const ce of evs) extendStroke(s.stroke, ce.clientX, writeY(ce.clientY));
       else extendStroke(s.stroke, p.x, writeY(p.y));
@@ -97,8 +130,6 @@ function onMove(e) {
     } else if (Math.hypot(dx, dy) > 22) {
       d.moved = true;
     }
-  } else if (G.mode === "open" && G.openHold && Math.hypot(p.x - G.openHold.sx, p.y - G.openHold.sy) > 14) {
-    G.openHold.moved = true;
   }
 }
 
@@ -114,33 +145,39 @@ function onUp(e) {
 
   if (G.mode === "single" && G.single) {
     const s = G.single;
-    if (!s.moved && !s.fired && now - s.t0 < TAP_MS) {
-      if (s.icon) { evaporateDrop(s.icon); }
-      else if (s.drop && s.drop.state === "rest") { openDrop(s.drop); }
-      else {
-
+    if (s.handle) { endTextDrag(); }
+    else if (s.textHit) {
+      if (s.moved) {
+        endTextDrag();
+      } else if (now - s.t0 < TAP_MS) {
         const near = Math.hypot(s.sx - TAPQ.x, s.sy - TAPQ.y) < 40;
         if (now - TAPQ.t < DBLTAP_MS && near) {
-          cancelDot();
           TAPQ.t = 0;
-          startTyping(s.sx, writeY(s.sy));
+          editText(s.textHit);
         } else {
           TAPQ.t = now; TAPQ.x = s.sx; TAPQ.y = s.sy;
-          const px = s.sx, py = writeY(s.sy);
-          cancelDot();
-          TAPQ.timer = setTimeout(() => {
-            TAPQ.timer = null;
-            newStroke(px, py);
-            hideIntroHint();
-          }, DBLTAP_MS);
+          selectText(s.textHit);
         }
       }
     }
-  } else if (G.mode === "open" && G.openHold) {
-    const h = G.openHold;
-    if (!h.fired && !h.moved && now - h.t0 < TAP_MS) closeOpen();
-    else if (!h.fired && h.moved && now - h.t0 < TAP_MS) closeOpen();
+    else if (!s.moved && !s.fired && now - s.t0 < TAP_MS) {
+      if (s.icon) { evaporateDrop(s.icon); }
+      else if (s.drop && s.drop.state === "rest") { openDrop(s.drop); }
+      else if (isPlacing()) {
+        cancelPlacing();
+        startTyping(s.sx, writeY(s.sy));
+      }
+      else {
+        cancelDot();
+        newStroke(s.sx, writeY(s.sy));
+        hideIntroHint();
+        scheduleSave();
+      }
+    }
+  } else if (G.mode === "open") {
+    closeOpen();
   }
+  if (G.drawing) { finishStroke(G.drawing); G.drawing = null; }
   G.mode = "idle"; G.single = null; G.dbl = null; G.openHold = null;
 }
 
@@ -149,28 +186,26 @@ function updateGestures(now, dt) {
 
   if (G.mode === "single" && G.single && !G.single.moved && !G.single.fired) {
     const s = G.single, el = now - s.t0;
-    if (el > 250 && !s.drop && !s.icon) {
+    if (el > 250 && !s.drop && !s.icon && !s.handle && !isPlacing()) {
       breathTarget = U.clamp((el - 250) / (HOLD_MS - 250), 0, 1);
       CUE.bx = s.sx; CUE.by = s.sy; CUE.br = breathRadius() * 0.5;
     }
-    if (el >= HOLD_MS && !s.drop && !s.icon) {
+    if (el >= HOLD_MS && !s.drop && !s.icon && !s.handle && !isPlacing()) {
       s.fired = true;
       startBreath(s.sx, s.sy, breathRadius(), true);
       CUE.breathP = 1;
     }
-  } else if (G.mode === "open" && G.openHold && !G.openHold.moved && !G.openHold.fired) {
-    const h = G.openHold, el = now - h.t0, g = openGeom();
-    if (g && el > 250) {
-      breathTarget = U.clamp((el - 250) / (HOLD_MS - 250), 0, 1);
-      CUE.bx = g.x; CUE.by = g.y; CUE.br = g.r * 0.9;
-    }
-    if (el >= HOLD_MS) { h.fired = true; evaporateOpen(); CUE.breathP = 0; }
   } else if (G.mode === "double" && G.dbl && !G.dbl.moved && !G.dbl.fired) {
-    const d = G.dbl, el = now - d.t0;
-    frostTarget = U.clamp(el / HOLD_MS, 0, 1);
-    if (el >= HOLD_MS) {
+    const d = G.dbl, el = now - d.t0, c = centroid();
+    frostTarget = U.clamp(el / FROST_HOLD_MS, 0, 1);
+    CUE.fx = c.x; CUE.fy = c.y; CUE.fr = frostRadius();
+    if (el >= FROST_HOLD_MS) {
       d.fired = true;
-      showHint(freezeAll() ? "성에로 얼려서 남겼어요" : "얼릴 메모가 없어요");
+      showHint(
+        freezeNear(c.x, c.y, frostRadius())
+          ? "이 자리의 메모를 성에로 얼렸어요"
+          : "이 자리에는 얼릴 메모가 없어요",
+      );
     }
   }
 
@@ -182,5 +217,5 @@ function drawCues(ctx) {
   if (CUE.breathP > 0.01) {
     mist(ctx, CUE.bx, CUE.by, CUE.br * 1.02 * (0.3 + 0.7 * CUE.breathP), MIST_A * CUE.breathP, 7);
   }
-  drawEdgeFrost(ctx, CUE.frostP);
+  drawFrostCue(ctx, CUE.fx, CUE.fy, CUE.fr, CUE.frostP);
 }

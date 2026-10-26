@@ -1,3 +1,4 @@
+
 let VW, VH, PD;
 let SKY = null;
 let FOGW = null;
@@ -41,7 +42,6 @@ function rebuildAll() {
   ICET = U.layer(VW, VH, PD);
   frostDirty = true;
   buildOverlay();
-  buildEdgeFrost();
   lastBuild = Date.now();
 }
 
@@ -105,10 +105,20 @@ function draw() {
   drawBlooms(ctx, now);
   drawSill(ctx);
   drawDrops(ctx, now);
+  drawTextFrame(ctx);
   drawCaret(ctx, now);
-  drawCues(ctx);
   drawOpenView(ctx);
+  drawCues(ctx);
+  syncOpenUI();
   ctx.drawImage(OVL.c, 0, 0, VW, VH);
+}
+
+let openUIOn = false;
+function syncOpenUI() {
+  const on = !!DROPS.open;
+  if (on === openUIOn) return;
+  openUIOn = on;
+  document.body.classList.toggle("viewing", on);
 }
 
 let hintTimer = null;
@@ -148,12 +158,16 @@ function bindSize() {
 function bindUI() {
   bindSize();
   bindTextInput();
+  ["sizeBtn", "typeBtn", "resetBtn", "helpBtn"].forEach((id) =>
+    keepTypingOnUI(document.getElementById(id)),
+  );
 
   const tb = document.getElementById("typeBtn");
   tb.addEventListener("click", (e) => {
     e.stopPropagation();
     if (isTyping()) stopTyping();
-    else startTyping(VW * 0.12, VH * 0.2);
+    else if (isPlacing()) cancelPlacing();
+    else startPlacing();
   });
   const btn = document.getElementById("helpBtn"), panel = document.getElementById("helpPanel");
   btn.addEventListener("click", (e) => { e.stopPropagation(); panel.classList.toggle("show"); });
@@ -161,24 +175,9 @@ function bindUI() {
     if (!panel.contains(e.target) && e.target !== btn) panel.classList.remove("show");
   });
 
-  const rb = document.getElementById("resetBtn");
-  let armed = false, armTimer = null;
-  rb.addEventListener("click", () => {
-    if (!armed) {
-      armed = true;
-      rb.textContent = "정말 지울까요?";
-      rb.classList.add("armed");
-      armTimer = setTimeout(disarm, 3000);
-    } else {
-      disarm();
-      resetAll();
-      panel.classList.remove("show");
-      showHint("창문 위 메모를 모두 지웠어요")
-    }
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    resetAll();
+    panel.classList.remove("show");
+    showHint("창문 위 메모를 모두 지웠어요");
   });
-  function disarm() {
-    armed = false; clearTimeout(armTimer);
-    rb.textContent = "모두 지우기";
-    rb.classList.remove("armed");
-  }
 }

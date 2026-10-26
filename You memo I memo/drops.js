@@ -1,3 +1,4 @@
+
 const DROPS = {
   archive: [],
   list: [],
@@ -8,7 +9,6 @@ const DROPS = {
 function sillH() { return Math.max(46, VH * 0.085); }
 function sillTop() { return VH - sillH(); }
 function dropBaseR() { return U.clamp(Math.min(VW, VH) * 0.06, 22, 32); }
-function openR() { return Math.min(VW, VH) * 0.36; }
 
 function memoBBox(mem) {
   const key = VW + "x" + VH;
@@ -29,22 +29,36 @@ function memoBBox(mem) {
       if (y < y0) y0 = y; if (y > y1) y1 = y;
     }
   }
-  mem._bb = { key: key, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, span: Math.max(x1 - x0, y1 - y0, 60) };
+  mem._bb = {
+    key: key,
+    cx: (x0 + x1) / 2, cy: (y0 + y1) / 2,
+    w: Math.max(x1 - x0, 1), h: Math.max(y1 - y0, 1),
+    span: Math.max(x1 - x0, y1 - y0, 60),
+  };
   return mem._bb;
 }
 
-function makeInner(mem, k) {
-  return function (ctx, r) {
-    const bb = memoBBox(mem);
-    const s = (r * 1.32) / bb.span;
-    ctx.save();
-    ctx.globalAlpha *= k;
-    ctx.translate(-bb.cx * s, -bb.cy * s);
-    ctx.lineCap = "round"; ctx.lineJoin = "round";
-    for (const st of mem.strokes) {
-      if (st.text) { drawTextScaled(ctx, st, s); continue; }
-      const lw = U.clamp(st.w * s * 0.32, 1.1, Math.max(1.4, r * 0.1));
-      tracePts(ctx, st.pts, VW * s, VH * s);
+function paintMemoScaled(ctx, mem, s, k, lwMax) {
+  const bb = memoBBox(mem);
+  ctx.save();
+  ctx.globalAlpha *= k;
+  ctx.translate(-bb.cx * s, -bb.cy * s);
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const st of mem.strokes) {
+    if (st.text) { drawTextScaled(ctx, st, s, st.ice); continue; }
+    const lw = U.clamp(st.w * s * 0.32, 1.1, lwMax);
+    tracePts(ctx, st.pts, VW * s, VH * s);
+    if (st.ice) {
+      ctx.strokeStyle = "rgba(142,184,236,0.55)";
+      ctx.lineWidth = lw * 3.4;
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(236,247,255,0.95)";
+      ctx.lineWidth = lw * 1.7;
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.75)";
+      ctx.lineWidth = lw * 0.55;
+      ctx.stroke();
+    } else {
       ctx.strokeStyle = "rgba(255,255,255,0.26)";
       ctx.lineWidth = lw * 2.3;
       ctx.stroke();
@@ -52,7 +66,14 @@ function makeInner(mem, k) {
       ctx.lineWidth = lw;
       ctx.stroke();
     }
-    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function makeInner(mem, k) {
+  return function (ctx, r) {
+    const bb = memoBBox(mem);
+    paintMemoScaled(ctx, mem, (r * 1.32) / bb.span, k, Math.max(1.4, r * 0.1));
   };
 }
 
@@ -75,9 +96,10 @@ function layoutDrops(dt) {
   const vis = DROPS.list.filter((d) => d.state !== "evap").sort((a, b) => a.mem.ts - b.mem.ts);
   const DR = dropBaseR();
   const margin = 14 + DR;
-  const perRow = Math.min(MAX_PER_ROW, Math.max(3, Math.floor((VW - 2 * margin) / (DR * 2.3)) + 1));
+  const perRow = Math.min(MAX_PER_ROW, Math.max(3, Math.floor((VW - 2 * margin) / (DR * 2.95)) + 1));
   const spacing = Math.min((VW - 2 * margin) / (perRow - 1), DR * 3);
   const startX = (VW - (perRow - 1) * spacing) / 2;
+  DROPS.spacing = spacing;
   const cap = perRow * 3;
   const hiddenN = Math.max(0, vis.length - cap);
   const top = sillTop();
@@ -87,9 +109,8 @@ function layoutDrops(dt) {
     d.hidden = k < 0;
     if (d.hidden) return;
     const row = Math.floor(k / perRow), col = k % perRow;
-
     d.tx = startX + col * spacing;
-    d.ty = top - d.R * 0.62 - row * DR * 2.3;
+    d.ty = top - d.R * 0.8 - row * DR * 2.95;
   });
 }
 
@@ -117,8 +138,8 @@ function archiveAll() {
     ice: src.some((s) => s.frozen),
     strokes: src.map((s) =>
       s.kind === "text"
-        ? { text: 1, str: s.str, x: s.x, y: s.y, sizeR: s.sizeR, wrapR: s.wrapR, gone: (s.gone || []).slice(), seed: s.seed }
-        : { pts: s.pts.slice(), w: s.w },
+        ? { text: 1, ice: !!s.frozen, str: s.str, x: s.x, y: s.y, sizeR: s.sizeR, wrapR: s.wrapR, gone: (s.gone || []).slice(), seed: s.seed }
+        : { ice: !!s.frozen, pts: s.pts.slice(), w: s.w },
     ),
   };
   DROPS.archive.push(mem);
@@ -157,7 +178,6 @@ function gatherStrokes(now) {
 }
 
 function updateDrops(now, dt) {
-
   const o = DROPS.open;
   if (o) {
     o.p = U.clamp(o.p + o.dir * (dt / 0.36), 0, 1);
@@ -182,19 +202,18 @@ function updateDrops(now, dt) {
         MEMO.strokes.push(d.trail);
       }
     } else if (d.state === "slide") {
-      const nz = U.noise1(d.nseed + now * 0.0013);
-      const u = U.clamp((nz - 0.3) / 0.4, 0, 1);
-      const vT = 40 + 820 * u * u;
-      d.v += (vT - d.v) * Math.min(1, dt * 3);
+      const nz = U.noise1(d.nseed + now * 0.0021);
+      const u = U.clamp((nz - 0.22) / 0.4, 0, 1);
+      const vT = 170 + 1500 * u * u;
+      d.v += (vT - d.v) * Math.min(1, dt * 4.5);
       d.y += d.v * dt;
       const prog = U.clamp((d.y - d.y0) / Math.max(60, d.ty - d.y0), 0, 1);
       d.x = d.x0 + (U.noise1(d.nseed * 2 + d.y * 0.012) - 0.5) * d.R * 1.1 * Math.sin(prog * Math.PI);
-      const st = 1 + Math.min(0.28, d.v / 2600);
+      const st = 1 + Math.min(0.34, d.v / 3400);
       d.sy = st; d.sx = 1 / Math.sqrt(st);
       if (d.trail) extendStroke(d.trail, d.x, d.y);
       if (d.y >= d.ty) {
         d.state = "land"; d.t0 = now; d.y = d.ty;
-
         if (d.trail) { d.trail.lifeMs = 2000; d.trail.t0 = Date.now() - 2000 * 0.6; d.trail = null; }
       }
     } else if (d.state === "land") {
@@ -239,7 +258,6 @@ function drawSill(ctx) {
   ctx.fillRect(0, top, VW, 1.5);
   ctx.fillStyle = "rgba(0,0,0,0.1)";
   ctx.fillRect(0, top + h * 0.41, VW, 1);
-
   const gr = ctx.createLinearGradient(0, top, 0, top + 7);
   gr.addColorStop(0, "rgba(20,30,44,0.28)");
   gr.addColorStop(1, "rgba(20,30,44,0)");
@@ -259,11 +277,49 @@ function drawDrops(ctx, now) {
       ice: d.mem.ice, spread: 3.2, inner: makeInner(d.mem, k),
     });
   }
+  drawDropLabels(ctx);
   drawDropIcons(ctx);
 }
 
+function stamp(ts, withTime) {
+  const d = new Date(ts);
+  const p = (n) => String(n).padStart(2, "0");
+  const day = p(d.getFullYear() % 100) + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate());
+  return withTime ? day + " \u00b7 " + p(d.getHours()) + ":" + p(d.getMinutes()) : day;
+}
+
+function labelFont(px) {
+  return "500 " + px.toFixed(1) + "px -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
+}
+
+function drawDropLabels(ctx) {
+  let fs = U.clamp(dropBaseR() * 0.34, 7.5, 11);
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+
+  ctx.font = labelFont(fs);
+  const avail = Math.max(40, (DROPS.spacing || dropBaseR() * 3) - 8);
+  const w = ctx.measureText("00/00/00").width;
+  if (w > avail) fs = Math.max(6.5, fs * (avail / w));
+  ctx.font = labelFont(fs);
+
+  for (const d of DROPS.list) {
+    if (d.hidden || d.state !== "rest") continue;
+    if (DROPS.open && DROPS.open.drop === d) continue;
+    const label = stamp(d.mem.ts);
+    const y = d.y + d.R * 0.98 + 10;
+    ctx.globalAlpha = d.alpha === undefined ? 1 : d.alpha;
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.fillText(label, d.x + 0.7, y + 0.7);
+    ctx.fillStyle = "rgba(42,58,80,0.78)";
+    ctx.fillText(label, d.x, y);
+  }
+  ctx.restore();
+}
+
 function dropIconPos(d) {
-  return { x: d.x + d.R * 0.78, y: d.y - d.R * 0.78, r: U.clamp(dropBaseR() * 0.34, 7.5, 11) };
+  return { x: d.x + d.R * 0.8, y: d.y - d.R * 0.72, r: U.clamp(dropBaseR() * 0.26, 6.5, 8.5) };
 }
 
 function hitDropIcon(x, y) {
@@ -281,12 +337,12 @@ function drawDropIcons(ctx) {
     if (d.hidden || d.state !== "rest" || (DROPS.open && DROPS.open.drop === d)) continue;
     const ic = dropIconPos(d), k = ic.r * 0.36;
     ctx.save();
-    ctx.fillStyle = "rgba(16,26,40,0.66)";
-    ctx.strokeStyle = "rgba(255,255,255,0.8)";
-    ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(18,30,46,0.5)";
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 0.9;
     ctx.beginPath(); ctx.arc(ic.x, ic.y, ic.r, 0, TAU); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = "rgba(255,255,255,0.95)";
-    ctx.lineWidth = 1.5; ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 1.2; ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(ic.x - k, ic.y - k); ctx.lineTo(ic.x + k, ic.y + k);
     ctx.moveTo(ic.x + k, ic.y - k); ctx.lineTo(ic.x - k, ic.y + k);
@@ -313,27 +369,29 @@ function hitDrop(x, y) {
   return best;
 }
 
-function openDrop(d) { DROPS.open = { drop: d, p: 0, dir: 1 }; DROPS.dimOut = 0; }
+function openDrop(d) {
+  DROPS.open = { drop: d, p: 0, dir: 1 };
+  DROPS.dimOut = 0;
+  if (typeof showHint === "function") showHint("아무 곳이나 톡 하면 닫혀요", 2400);
+}
 function closeOpen() { if (DROPS.open) DROPS.open.dir = -1; }
 
-function openGeom() {
+function openRect() {
   const o = DROPS.open;
   if (!o) return null;
   const e = U.easeOut(o.p), d = o.drop;
-  return { x: U.lerp(d.x, VW / 2, e), y: U.lerp(d.y, VH * 0.45, e), r: U.lerp(d.r, openR(), e), e: e };
+
+  const k = U.lerp((d.r * 2) / VW, 1, e);
+  const cx = U.lerp(d.x, VW / 2, e);
+  const cy = U.lerp(d.y, VH / 2, e);
+  return { x: cx - (VW * k) / 2, y: cy - (VH * k) / 2, w: VW * k, h: VH * k, cx: cx, cy: cy, e: e, k: k };
 }
 
-function evaporateOpen() {
-  const o = DROPS.open, g = openGeom();
-  if (!o) return;
-  const d = o.drop;
-  d.x = g.x; d.y = g.y; d.r = g.r; d.r0 = g.r;
-  d.state = "evap"; d.t0 = performance.now();
-  DROPS.dimOut = 0.62 * g.e;
-  DROPS.open = null;
-  DROPS.archive = DROPS.archive.filter((m) => m !== d.mem);
-  startBreath(g.x, g.y, g.r * 1.3, false);
-  saveState();
+function openGeom() {
+  const R = openRect();
+  if (!R) return null;
+  const d = DROPS.open.drop;
+  return { x: R.cx, y: R.cy, r: U.lerp(d.r, Math.min(VW, VH) * 0.33, R.e), e: R.e, rect: R };
 }
 
 function drawOpenView(ctx) {
@@ -345,16 +403,82 @@ function drawOpenView(ctx) {
     ctx.fillRect(0, 0, VW, VH);
   }
   if (!o) return;
-  const d = o.drop;
-  paintDrop(ctx, g.x, g.y, g.r, { ice: d.mem.ice, spread: 2.8, inner: makeInner(d.mem, 1) });
-  if (g.e > 0.7) {
-    const when = new Date(d.mem.ts).toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+  const d = o.drop, R = g.rect;
+  const rad = U.lerp(Math.min(22, VW * 0.06), 0, R.e);
+
+  if (R.e < 0.99) {
     ctx.save();
-    ctx.globalAlpha = (g.e - 0.7) / 0.3;
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.font = "500 14px -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
+    ctx.shadowColor = "rgba(4,10,20,0.5)";
+    ctx.shadowBlur = 28;
+    ctx.shadowOffsetY = 12;
+    roundRectPath(ctx, R.x, R.y, R.w, R.h, rad);
+    ctx.fillStyle = "rgba(12,22,36,0.6)";
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.save();
+  roundRectPath(ctx, R.x, R.y, R.w, R.h, rad);
+  ctx.clip();
+
+  ctx.drawImage(SCENE.c, R.x, R.y, R.w, R.h);
+  if (FOGB) {
+    ctx.globalAlpha = 0.24;
+    ctx.drawImage(FOGB.c, R.x, R.y, R.w, R.h);
+    ctx.globalAlpha = 1;
+  }
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = getIcePattern();
+  ctx.fillRect(R.x, R.y, R.w, R.h);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "rgba(12,22,38,0.18)";
+  ctx.fillRect(R.x, R.y, R.w, R.h);
+
+  const bb = memoBBox(d.mem);
+  ctx.save();
+  ctx.translate(R.x + bb.cx * R.k, R.y + bb.cy * R.k);
+  paintMemoScaled(ctx, d.mem, R.k, 1, Math.max(1.6, 14 * R.k));
+  ctx.restore();
+
+  if (d.mem.ice) {
+    ctx.save();
+    ctx.globalAlpha = 0.16 * R.e;
+    ctx.fillStyle = getIcePattern();
+    ctx.fillRect(R.x, R.y, R.w, R.h);
+    ctx.globalAlpha = R.e;
+    ctx.fillStyle = "rgba(168,206,246,0.11)";
+    ctx.fillRect(R.x, R.y, R.w, R.h);
+    ctx.restore();
+  }
+
+  const sh = ctx.createLinearGradient(R.x, R.y, R.x + R.w * 0.75, R.y + R.h);
+  sh.addColorStop(0, "rgba(255,255,255,0.15)");
+  sh.addColorStop(0.42, "rgba(255,255,255,0)");
+  sh.addColorStop(1, "rgba(255,255,255,0.06)");
+  ctx.fillStyle = sh;
+  ctx.fillRect(R.x, R.y, R.w, R.h);
+  ctx.restore();
+
+  if (R.e < 0.99) {
+    ctx.save();
+    roundRectPath(ctx, R.x + 0.75, R.y + 0.75, R.w - 1.5, R.h - 1.5, rad);
+    ctx.strokeStyle = "rgba(255,255,255," + 0.5 * (1 - R.e) + ")";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if (R.e > 0.7) {
+    const when = stamp(d.mem.ts, true);
+    ctx.save();
+    ctx.globalAlpha = (R.e - 0.7) / 0.3;
+    ctx.fillStyle = "rgba(255,255,255,0.88)";
+    ctx.font = labelFont(14);
+    ctx.letterSpacing = "0.02em";
     ctx.textAlign = "center";
-    ctx.fillText(when, g.x, g.y + g.r + 30);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(when, VW / 2, VH - U.clamp(VH * 0.035, 22, 40));
     ctx.restore();
   }
 }

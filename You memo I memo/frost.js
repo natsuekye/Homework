@@ -1,6 +1,6 @@
+
 let FROSTL = null;
 let frostDirty = true;
-let EDGEF = null;
 let iceTex = null;
 
 function markFrostDirty() { frostDirty = true; }
@@ -14,7 +14,6 @@ function getIcePattern() {
   x.fillStyle = "rgba(226,240,255,0.62)";
   x.fillRect(0, 0, S, S);
   const rnd = U.rng(4242);
-
   const img = x.getImageData(0, 0, S, S);
   for (let i = 0; i < S * S; i++) {
     const v = rnd();
@@ -24,7 +23,6 @@ function getIcePattern() {
     }
   }
   x.putImageData(img, 0, 0);
-
   const wrap = (fn) => { for (let ox = -S; ox <= S; ox += S) for (let oy = -S; oy <= S; oy += S) fn(ox, oy); };
   for (let i = 0; i < 70; i++) {
     const px = rnd() * S, py = rnd() * S, a = rnd() * TAU, l = 8 + rnd() * 26;
@@ -58,15 +56,17 @@ function addBranch(st, x, y, ang, len, depth, delay, rnd) {
 }
 
 const FROST_SWEEP_MS = 1200;
+const FROST_SWEEP_TEXT_MS = 450;
 const FROST_SPUR_CHANCE = 0;
+
+function sweepMs(s) { return s.kind === "text" ? FROST_SWEEP_TEXT_MS : FROST_SWEEP_MS; }
 
 function frostFor(s) {
   const key = VW + "x" + VH;
   if (s.kind === "text") {
-
     if (s._fc && s._fc.key === key) return s._fc;
     layoutText(s);
-    s._fc = { d: [[], [], []], end: FROST_SWEEP_MS + 120, key: key,
+    s._fc = { d: [[], [], []], end: FROST_SWEEP_TEXT_MS + 120, key: key,
       sp: memoTextSparkles(s), len: Math.max(1, s.chars.length) };
     return s._fc;
   }
@@ -97,7 +97,6 @@ function frostFor(s) {
       addBranch(st, ox, oy, ang, len, 0, (cum[i] / total) * FROST_SWEEP_MS + rnd() * 150, rnd);
     }
   }
-
   const spN = U.clamp(Math.round(total / 90), 2, 10);
   for (let k = 0; k < spN; k++) {
     const i = Math.min(n - 1, Math.floor(rnd() * n));
@@ -150,7 +149,7 @@ function renderBands(now) {
   const list = [];
   for (const s of MEMO.strokes) {
     if (s.frozen && (s.kind === "wipe" || s.kind === "text")) {
-      list.push({ s: s, p: U.clamp((now - s.frostT0) / FROST_SWEEP_MS, 0, 1), len: frostFor(s).len });
+      list.push({ s: s, p: U.clamp((now - s.frostT0) / sweepMs(s), 0, 1), len: frostFor(s).len });
     }
   }
   const B = ICEB.x, T = ICET.x;
@@ -208,7 +207,6 @@ function drawFrost(ctx, now) {
     if (!s.frozen || (s.kind !== "wipe" && s.kind !== "text")) continue;
     const st = frostFor(s);
     if (!s.baked) drawFronds(ctx, st, now - s.frostT0, 1);
-
     const sp = st.sp;
     for (let i = 0; i < sp.length; i += 3) {
       const tw = Math.pow(0.5 + 0.5 * Math.sin(now * 0.0026 + sp[i + 2] * 3), 4);
@@ -224,22 +222,20 @@ function drawFrost(ctx, now) {
   }
 }
 
-function buildEdgeFrost() { EDGEF = true; }
+function drawFrostCue(ctx, x, y, r, p) {
+  if (p < 0.01 || r < 1) return;
+  const rr = r * (0.5 + 0.5 * p);
+  ctx.save();
+  const g = ctx.createRadialGradient(x, y, rr * 0.2, x, y, rr);
+  g.addColorStop(0, "rgba(226,242,255,0)");
+  g.addColorStop(0.55, "rgba(226,242,255," + 0.16 * p + ")");
+  g.addColorStop(0.88, "rgba(232,246,255," + 0.46 * p + ")");
+  g.addColorStop(1, "rgba(236,249,255," + 0.62 * p + ")");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, rr, 0, TAU); ctx.fill();
 
-function drawEdgeFrost(ctx, p) {
-  if (p < 0.01) return;
-  const dp = Math.min(VW, VH) * 0.2 * (0.4 + 0.6 * p);
-  const a = 0.62 * p;
-  const mk = (x0, y0, x1, y1, rx, ry, rw, rh) => {
-    const g = ctx.createLinearGradient(x0, y0, x1, y1);
-    g.addColorStop(0, "rgba(232,244,255," + a + ")");
-    g.addColorStop(0.5, "rgba(232,244,255," + a * 0.35 + ")");
-    g.addColorStop(1, "rgba(232,244,255,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(rx, ry, rw, rh);
-  };
-  mk(0, 0, 0, dp, 0, 0, VW, dp);
-  mk(0, VH, 0, VH - dp, 0, VH - dp, VW, dp);
-  mk(0, 0, dp, 0, 0, 0, dp, VH);
-  mk(VW, 0, VW - dp, 0, VW - dp, 0, dp, VH);
+  ctx.strokeStyle = "rgba(244,251,255," + 0.5 * p + ")";
+  ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(x, y, rr, 0, TAU); ctx.stroke();
+  ctx.restore();
 }
