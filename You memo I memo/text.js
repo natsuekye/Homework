@@ -111,7 +111,9 @@ function bindTextInput() {
     }
   });
   el.addEventListener("blur", () => {
-    if (TEXT.dragging || performance.now() - (TEXT.uiTouch || 0) < 700) {
+    if (TEXT.dragging ||
+        performance.now() - (TEXT.uiTouch || 0) < 700 ||
+        performance.now() - (TEXT.focusAt || 0) < 700) {
       setTimeout(() => {
         if (TEXT.editing) el.focus({ preventScroll: true });
       }, 0);
@@ -126,6 +128,11 @@ function bindTextInput() {
       if (p && p.catch) p.catch(() => {});
     } catch (e) {}
   }
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("scroll", lockScroll);
+  }
+  window.addEventListener("scroll", lockScroll, { passive: true });
 
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => {
@@ -142,12 +149,18 @@ function bindTextInput() {
 }
 
 function keepCaretVisible(t) {
-  const vh = window.visualViewport ? window.visualViewport.height : VH;
-  const bottom = vh - t.px * 1.3;
+  if (!t) return;
+  const vv = window.visualViewport;
+  const vh = vv ? Math.min(vv.height, VH) : VH;
+  const bottom = vh - (t.px * 1.3 + handleR() + 12);
   const cy = t.y * VH + t.caret.y;
   if (cy > bottom) t.y = (t.y * VH - (cy - bottom)) / VH;
-  const top = t.px * 0.9;
+  const top = t.px * 1.1;
   if (t.y * VH < top) t.y = top / VH;
+}
+
+function lockScroll() {
+  if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
 }
 
 function startTyping(xPx, yPx) {
@@ -160,6 +173,10 @@ function startTyping(xPx, yPx) {
   if (el) {
     el.value = "";
     el.focus({ preventScroll: true });
+    TEXT.focusAt = performance.now();
+    [60, 180, 400, 700].forEach((ms) =>
+      setTimeout(() => { if (TEXT.editing === t) { lockScroll(); keepCaretVisible(t); } }, ms),
+    );
   }
   hideIntroHint();
   return t;

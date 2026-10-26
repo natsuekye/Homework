@@ -38,7 +38,7 @@
         -webkit-touch-callout: none;
         -webkit-tap-highlight-color: transparent;
       }
-      canvas { display: block; touch-action: none; }
+      canvas { display: block; touch-action: none; position: fixed; top: 0; left: 0; }
 
       #hint {
         position: fixed; left: 50%; bottom: calc(14vh + 12px);
@@ -86,7 +86,7 @@
       }
 
       #typer {
-        position: fixed; left: 0; bottom: 0; width: 1px; height: 1px;
+        position: fixed; left: 50%; top: 0; width: 1px; height: 1px;
         opacity: 0.01; border: 0; padding: 0; margin: 0; resize: none;
         background: transparent; color: transparent; caret-color: transparent;
         font-size: 16px;

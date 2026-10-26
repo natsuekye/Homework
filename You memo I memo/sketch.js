@@ -76,6 +76,7 @@ function windowResized() {
     resizeCanvas(VW, VH);
     pixelDensity(PD);
     rebuildAll();
+    if (isTyping()) keepCaretVisible(TEXT.editing);
   }, 200);
 }
 
@@ -87,6 +88,7 @@ function draw() {
   if (wall - lastBuild > 300000) refreshScene();
 
   updateGestures(now, dt);
+  if (isTyping() && !TEXT.dragging) keepCaretVisible(TEXT.editing);
   updateBreaths(now);
   MEMO.strokes = MEMO.strokes.filter((s) => s.frozen || strokeLook(s, wall));
   updateDrops(now, dt);
