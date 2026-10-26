@@ -4,6 +4,9 @@ const DROPS = {
   list: [],
   open: null,
   dimOut: 0,
+  hidden: [],
+  spacing: 0,
+  shelf: { open: false, p: 0, scroll: 0 },
 };
 
 function sillH() { return Math.max(46, VH * 0.085); }
@@ -96,22 +99,174 @@ function layoutDrops(dt) {
   const vis = DROPS.list.filter((d) => d.state !== "evap").sort((a, b) => a.mem.ts - b.mem.ts);
   const DR = dropBaseR();
   const margin = 14 + DR;
-  const perRow = Math.min(MAX_PER_ROW, Math.max(3, Math.floor((VW - 2 * margin) / (DR * 2.95)) + 1));
-  const spacing = Math.min((VW - 2 * margin) / (perRow - 1), DR * 3);
-  const startX = (VW - (perRow - 1) * spacing) / 2;
+  const dw = drawerRect().w + 18;
+  const usable = Math.max(DR * 4, VW - 2 * margin - dw);
+
+  const perRow = Math.min(MAX_PER_ROW, Math.max(2, Math.floor(usable / (DR * 2.95)) + 1));
+  const spacing = Math.min(usable / Math.max(1, perRow - 1), DR * 3);
+  const startX = margin + (usable - (perRow - 1) * spacing) / 2;
   DROPS.spacing = spacing;
-  const cap = perRow * 3;
-  const hiddenN = Math.max(0, vis.length - cap);
+
+  const hiddenN = Math.max(0, vis.length - perRow);
   const top = sillTop();
+  DROPS.hidden = [];
   vis.forEach((d, i) => {
     d.R = DR;
     const k = i - hiddenN;
     d.hidden = k < 0;
-    if (d.hidden) return;
-    const row = Math.floor(k / perRow), col = k % perRow;
-    d.tx = startX + col * spacing;
-    d.ty = top - d.R * 0.8 - row * DR * 2.95;
+    if (d.hidden) { DROPS.hidden.push(d); return; }
+    d.tx = startX + k * spacing;
+    d.ty = top - d.R * 0.8;
   });
+}
+
+function drawerRect() {
+  const R = dropBaseR();
+  const w = R * 2.1, h = R * 1.9;
+  return { x: VW - w - 12, y: sillTop() - h * 0.66, w: w, h: h };
+}
+
+function hitDrawer(x, y) {
+  if (!DROPS.hidden.length || DROPS.open || DROPS.shelf.open) return false;
+  const r = drawerRect();
+  return x > r.x - 8 && x < r.x + r.w + 8 && y > r.y - 8 && y < r.y + r.h + 12;
+}
+
+function drawDrawer(ctx) {
+  const n = DROPS.hidden.length;
+  if (!n || DROPS.shelf.open) return;
+  const r = drawerRect(), rad = r.w * 0.22;
+
+  ctx.save();
+  roundRectPath(ctx, r.x, r.y, r.w, r.h, rad);
+  ctx.fillStyle = "rgba(226,238,252,0.3)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  ctx.save();
+  roundRectPath(ctx, r.x, r.y, r.w, r.h, rad);
+  ctx.clip();
+  const br = r.w * 0.2;
+  for (let i = 0; i < Math.min(3, n); i++) {
+    const bx = r.x + r.w * (0.3 + i * 0.2);
+    const by = r.y + r.h * (0.66 - i * 0.07);
+    ctx.globalAlpha = 0.5 + i * 0.16;
+    ctx.fillStyle = "rgba(170,205,245,0.85)";
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.beginPath(); ctx.arc(bx - br * 0.3, by - br * 0.32, br * 0.26, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+
+  const fs = U.clamp(r.w * 0.3, 9, 13);
+  ctx.font = labelFont(fs);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(8,16,28,0.5)";
+  ctx.shadowBlur = fs * 0.8;
+  ctx.fillStyle = "rgba(255,255,255,0.96)";
+  ctx.fillText(String(n), r.x + r.w * 0.5, r.y + r.h * 0.28);
+  ctx.restore();
+}
+
+function openShelf() { DROPS.shelf.open = true; DROPS.shelf.scroll = 0; }
+function closeShelf() { DROPS.shelf.open = false; }
+
+function shelfGeom() {
+  const list = DROPS.hidden.slice().reverse();
+  const R = dropBaseR() * 0.9;
+  const gap = R * 1.1;
+  const cell = R * 2 + gap;
+  const side = Math.max(14, VW * 0.05);
+  const cols = Math.max(2, Math.floor((VW - side * 2 + gap) / cell));
+  const gw = cols * cell - gap;
+  const x0 = (VW - gw) / 2 + R;
+  const y0 = Math.max(78, VH * 0.17) + R;
+  const rowH = cell + R * 0.6;
+  const cells = list.map((d, i) => ({
+    d: d, r: R,
+    x: x0 + (i % cols) * cell,
+    y: y0 + Math.floor(i / cols) * rowH - DROPS.shelf.scroll,
+  }));
+  const rows = Math.ceil(list.length / cols) || 1;
+  return { cells: cells, r: R, rowH: rowH, bottom: y0 + rows * rowH + R };
+}
+
+function shelfMaxScroll() {
+  const g = shelfGeom();
+  return Math.max(0, g.bottom + DROPS.shelf.scroll - (VH - 24));
+}
+
+function shelfIconPos(c) {
+  return { x: c.x + c.r * 0.8, y: c.y - c.r * 0.72, r: U.clamp(c.r * 0.28, 7, 9.5) };
+}
+
+function hitShelfCell(x, y) {
+  if (!DROPS.shelf.open) return null;
+  for (const c of shelfGeom().cells) {
+    if (Math.hypot(x - c.x, y - c.y) < c.r * 1.2) return c.d;
+  }
+  return null;
+}
+
+function hitShelfIcon(x, y) {
+  if (!DROPS.shelf.open) return null;
+  for (const c of shelfGeom().cells) {
+    const ic = shelfIconPos(c);
+    if (Math.hypot(x - ic.x, y - ic.y) < ic.r + 7) return c.d;
+  }
+  return null;
+}
+
+function removeMemo(d) {
+  DROPS.archive = DROPS.archive.filter((m) => m !== d.mem);
+  DROPS.list = DROPS.list.filter((x) => x !== d);
+  saveState();
+}
+
+function drawShelf(ctx) {
+  const sh = DROPS.shelf;
+  if (sh.p < 0.005) return;
+  const e = U.easeOut(sh.p);
+
+  ctx.save();
+  ctx.globalAlpha = e;
+  ctx.fillStyle = "rgba(8,14,24,0.66)";
+  ctx.fillRect(0, 0, VW, VH);
+
+  const g = shelfGeom();
+  const fs = U.clamp(g.r * 0.34, 8, 11);
+
+  ctx.font = labelFont(U.clamp(VW * 0.038, 14, 18));
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.fillText("지난 메모 " + DROPS.hidden.length, VW / 2, Math.max(52, VH * 0.11));
+
+  ctx.font = labelFont(fs);
+  ctx.textBaseline = "top";
+  for (const c of g.cells) {
+    if (c.y < -c.r * 2 || c.y > VH + c.r * 2) continue;
+    paintDrop(ctx, c.x, c.y, c.r, { spread: 3.2, inner: makeInner(c.d.mem, 1) });
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.fillText(stamp(c.d.mem.ts), c.x, c.y + c.r * 1.05 + 5);
+
+    const ic = shelfIconPos(c);
+    const k = ic.r * 0.36;
+    ctx.fillStyle = "rgba(18,30,46,0.6)";
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.arc(ic.x, ic.y, ic.r, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 1.2; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(ic.x - k, ic.y - k); ctx.lineTo(ic.x + k, ic.y + k);
+    ctx.moveTo(ic.x + k, ic.y - k); ctx.lineTo(ic.x - k, ic.y + k);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function archiveAll() {
@@ -185,6 +340,9 @@ function updateDrops(now, dt) {
   } else if (DROPS.dimOut > 0) {
     DROPS.dimOut = Math.max(0, DROPS.dimOut - dt * 1.6);
   }
+  const sh = DROPS.shelf;
+  if (sh.open && !DROPS.hidden.length) sh.open = false;
+  sh.p = U.clamp(sh.p + (sh.open ? 1 : -1) * (dt / 0.28), 0, 1);
 
   layoutDrops(dt);
 
@@ -279,6 +437,7 @@ function drawDrops(ctx, now) {
   }
   drawDropLabels(ctx);
   drawDropIcons(ctx);
+  drawDrawer(ctx);
 }
 
 function stamp(ts, withTime) {
@@ -288,6 +447,40 @@ function stamp(ts, withTime) {
   return withTime ? day + " \u00b7 " + p(d.getHours()) + ":" + p(d.getMinutes()) : day;
 }
 
+const LABEL_CACHE = new Map();
+function labelSprite(label, fs, fg, glow, blur) {
+  const key = label + "|" + Math.round(fs * 10) + "|" + fg + "|" + glow;
+  const hit = LABEL_CACHE.get(key);
+  if (hit) return hit;
+
+  const pad = Math.ceil(blur * 1.8) + 2;
+  const probe = measCtx();
+  probe.font = labelFont(fs);
+  const w = Math.ceil(probe.measureText(label).width);
+  const W = w + pad * 2, H = Math.ceil(fs * 1.9) + pad * 2;
+
+  const pd = Math.min(3, PD || 2);
+  const c = document.createElement("canvas");
+  c.width = Math.ceil(W * pd); c.height = Math.ceil(H * pd);
+  const x = c.getContext("2d");
+  x.scale(pd, pd);
+  x.font = labelFont(fs);
+  x.textAlign = "center";
+  x.textBaseline = "top";
+  x.fillStyle = fg;
+  x.shadowColor = glow;
+  x.shadowBlur = blur;
+  x.fillText(label, W / 2, pad);
+  x.shadowColor = "transparent";
+  x.shadowBlur = 0;
+  x.fillText(label, W / 2, pad);
+
+  const spr = { c: c, w: W, h: H, ox: W / 2, oy: pad };
+  if (LABEL_CACHE.size > 60) LABEL_CACHE.clear();
+  LABEL_CACHE.set(key, spr);
+  return spr;
+}
+
 function labelFont(px) {
   return "500 " + px.toFixed(1) + "px -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
 }
@@ -295,8 +488,6 @@ function labelFont(px) {
 function drawDropLabels(ctx) {
   let fs = U.clamp(dropBaseR() * 0.34, 7.5, 11);
   ctx.save();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
 
   ctx.font = labelFont(fs);
   const avail = Math.max(40, (DROPS.spacing || dropBaseR() * 3) - 8);
@@ -304,16 +495,20 @@ function drawDropLabels(ctx) {
   if (w > avail) fs = Math.max(6.5, fs * (avail / w));
   ctx.font = labelFont(fs);
 
+  const dk = SKY ? SKY.dark : 0;
+  const t = U.smooth(U.clamp((dk - 0.42) / 0.16, 0, 1));
+  const fg = U.rgb(U.mix([38, 54, 76], [250, 253, 255], t), 0.92);
+  const glow = U.rgb(U.mix([255, 255, 255], [4, 10, 20], t), 0.8);
+  const blur = Math.max(3, fs * 0.8);
+
   for (const d of DROPS.list) {
     if (d.hidden || d.state !== "rest") continue;
     if (DROPS.open && DROPS.open.drop === d) continue;
     const label = stamp(d.mem.ts);
     const y = d.y + d.R * 0.98 + 10;
     ctx.globalAlpha = d.alpha === undefined ? 1 : d.alpha;
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.fillText(label, d.x + 0.7, y + 0.7);
-    ctx.fillStyle = "rgba(42,58,80,0.78)";
-    ctx.fillText(label, d.x, y);
+    const spr = labelSprite(label, fs, fg, glow, blur);
+    ctx.drawImage(spr.c, d.x - spr.ox, y - spr.oy, spr.w, spr.h);
   }
   ctx.restore();
 }
@@ -372,7 +567,6 @@ function hitDrop(x, y) {
 function openDrop(d) {
   DROPS.open = { drop: d, p: 0, dir: 1 };
   DROPS.dimOut = 0;
-  if (typeof showHint === "function") showHint("아무 곳이나 톡 하면 닫혀요", 2400);
 }
 function closeOpen() { if (DROPS.open) DROPS.open.dir = -1; }
 

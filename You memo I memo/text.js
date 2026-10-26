@@ -162,7 +162,6 @@ function startTyping(xPx, yPx) {
     el.focus({ preventScroll: true });
   }
   hideIntroHint();
-  showHint("빈 곳을 톡 하면 끝나요", 3000);
   return t;
 }
 
@@ -191,7 +190,7 @@ function startPlacing() {
   TEXT.placing = true;
   syncTypeBtn();
   hideIntroHint();
-  showHint("글을 쓸 곳을 톡 하세요", 4000);
+  showHint("글을 쓸 곳을 터치하세요", 4000);
 }
 function cancelPlacing() {
   TEXT.placing = false;

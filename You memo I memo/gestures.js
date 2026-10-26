@@ -5,7 +5,7 @@ const MOVE_TOL = 8;
 const SWIPE_DOWN_PX = 90;
 const FROST_HOLD_MS = 700;
 
-const G = { ptrs: new Map(), mode: "idle", single: null, dbl: null, openHold: null, drawing: null };
+const G = { ptrs: new Map(), mode: "idle", single: null, dbl: null, openHold: null, drawing: null, shelf: null };
 const DBLTAP_MS = 330;
 const TAPQ = { t: 0, x: 0, y: 0, timer: null };
 function cancelDot() { if (TAPQ.timer) { clearTimeout(TAPQ.timer); TAPQ.timer = null; } }
@@ -37,7 +37,17 @@ function onDown(e) {
   }
 
   if (G.mode === "idle") {
-    if (!DROPS.open && G.ptrs.size >= 2) {
+    if (DROPS.open) {
+      G.mode = "open";
+      G.openHold = { t0: now, sx: e.clientX, sy: e.clientY };
+      return;
+    }
+    if (DROPS.shelf.open) {
+      G.mode = "shelf";
+      G.shelf = { t0: now, sx: e.clientX, sy: e.clientY, s0: DROPS.shelf.scroll, moved: false };
+      return;
+    }
+    if (G.ptrs.size >= 2) {
       beginDouble(now);
       return;
     }
@@ -63,15 +73,16 @@ function onDown(e) {
       G.mode = "consumed";
       return;
     }
-    if (DROPS.open) {
-      G.mode = "open";
-      G.openHold = { t0: now, sx: e.clientX, sy: e.clientY };
-    } else {
-      G.mode = "single";
-      G.single = { id: e.pointerId, sx: e.clientX, sy: e.clientY, t0: now, moved: false, fired: false,
-        stroke: null, handle: null, icon: hitDropIcon(e.clientX, e.clientY), drop: null, textHit: null };
-      if (!G.single.icon) G.single.drop = hitDrop(e.clientX, e.clientY);
+    if (hitDrawer(e.clientX, e.clientY)) {
+      openShelf();
+      G.mode = "consumed";
+      return;
     }
+
+    G.mode = "single";
+    G.single = { id: e.pointerId, sx: e.clientX, sy: e.clientY, t0: now, moved: false, fired: false,
+      stroke: null, handle: null, icon: hitDropIcon(e.clientX, e.clientY), drop: null, textHit: null };
+    if (!G.single.icon) G.single.drop = hitDrop(e.clientX, e.clientY);
   } else if (G.mode === "single") {
     const s = G.single;
     if (s.stroke || (s.textHit && s.moved)) {
@@ -121,12 +132,16 @@ function onMove(e) {
       if (evs && evs.length) for (const ce of evs) extendStroke(s.stroke, ce.clientX, writeY(ce.clientY));
       else extendStroke(s.stroke, p.x, writeY(p.y));
     }
+  } else if (G.mode === "shelf" && G.shelf) {
+    const sh = G.shelf;
+    if (Math.abs(p.y - sh.sy) > 8) sh.moved = true;
+    DROPS.shelf.scroll = U.clamp(sh.s0 - (p.y - sh.sy), 0, shelfMaxScroll() + DROPS.shelf.scroll);
   } else if (G.mode === "double" && G.dbl && !G.dbl.fired) {
     const d = G.dbl, c = centroid();
     const dx = c.x - d.c0.x, dy = c.y - d.c0.y;
     if (dy > SWIPE_DOWN_PX && Math.abs(dx) < dy) {
       d.fired = true;
-      showHint(archiveAll() ? "물방울이 되어 창틀로 흘러내려요" : "보낼 메모가 없어요");
+      archiveAll();
     } else if (Math.hypot(dx, dy) > 22) {
       d.moved = true;
     }
@@ -176,9 +191,20 @@ function onUp(e) {
     }
   } else if (G.mode === "open") {
     closeOpen();
+  } else if (G.mode === "shelf" && G.shelf) {
+    const sh = G.shelf;
+    if (!sh.moved) {
+      const del = hitShelfIcon(sh.sx, sh.sy);
+      if (del) { removeMemo(del); }
+      else {
+        const d = hitShelfCell(sh.sx, sh.sy);
+        if (d) { closeShelf(); openDrop(d); }
+        else closeShelf();
+      }
+    }
   }
   if (G.drawing) { finishStroke(G.drawing); G.drawing = null; }
-  G.mode = "idle"; G.single = null; G.dbl = null; G.openHold = null;
+  G.mode = "idle"; G.single = null; G.dbl = null; G.openHold = null; G.shelf = null;
 }
 
 function updateGestures(now, dt) {
@@ -201,11 +227,7 @@ function updateGestures(now, dt) {
     CUE.fx = c.x; CUE.fy = c.y; CUE.fr = frostRadius();
     if (el >= FROST_HOLD_MS) {
       d.fired = true;
-      showHint(
-        freezeNear(c.x, c.y, frostRadius())
-          ? "이 자리의 메모를 성에로 얼렸어요"
-          : "이 자리에는 얼릴 메모가 없어요",
-      );
+      freezeNear(c.x, c.y, frostRadius());
     }
   }
 

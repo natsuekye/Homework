@@ -110,7 +110,9 @@
 
       #helpPanel {
         position: fixed; top: calc(env(safe-area-inset-top, 0px) + 54px); right: 12px;
-        width: min(300px, 82vw); padding: 16px 18px;
+        width: max-content;
+        max-width: min(387px, 86vw);
+        padding: 16px 18px;
         border-radius: 18px;
         background: rgba(18, 26, 38, 0.62);
         -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
@@ -152,11 +154,11 @@
     <button id="resetBtn" title="창틀에 보관된 물방울은 지워지지 않아요">모두 지우기</button>
     <button id="helpBtn" aria-label="도움말">?</button>
     <div id="helpPanel">
-      <p class="row"><b>한 손가락으로 문지르기</b><br />김이 닦이며 글씨·그림이 써져요</p>
-      <p class="row"><b>한 곳을 꾹</b><br />입김이 번져서 주변 메모가 지워져요</p>
-      <p class="row"><b>두 손가락으로 꾹</b><br />누른 자리 주위의 메모만 성에로 얼어붙어요</p>
+      <p class="row"><b>한 손가락으로 문지르기</b><br />창문 위로 그림이 그려져요</p>
+      <p class="row"><b>한 손가락으로 꾹 누르기</b><br />입김이 번져서 주변 메모가 지워져요</p>
+      <p class="row"><b>두 손가락으로 꾹 누르기 </b><br />누른 자리 주위의 메모만 성에로 얼어요</p>
       <p class="row"><b>두 손가락으로 아래로 쓸기</b><br />메모가 물방울이 되어 창틀로 흘러내려요</p>
-      <p class="pc">PC : Shift를 누른 채 마우스를 쓰면 두 손가락 동작이 돼요.</p>
+      <p class="pc">PC : Shift 키와 마우스를 함께 사용하면 두 손가락 동작이 돼요.</p>
     </div>
 
     <script src="util.js"></script>

@@ -29,7 +29,7 @@ function setup() {
   bindUI();
   READY = true;
 
-  if (!MEMO.strokes.length && !DROPS.archive.length) showHint("유리를 손가락으로 문질러 보세요", 5200, true);
+  if (!MEMO.strokes.length && !DROPS.archive.length) showHint("유리 위를 문질러 보세요", 5200, true);
 }
 
 function rebuildAll() {
@@ -107,6 +107,7 @@ function draw() {
   drawDrops(ctx, now);
   drawTextFrame(ctx);
   drawCaret(ctx, now);
+  drawShelf(ctx);
   drawOpenView(ctx);
   drawCues(ctx);
   syncOpenUI();
@@ -115,7 +116,7 @@ function draw() {
 
 let openUIOn = false;
 function syncOpenUI() {
-  const on = !!DROPS.open;
+  const on = !!DROPS.open || DROPS.shelf.open;
   if (on === openUIOn) return;
   openUIOn = on;
   document.body.classList.toggle("viewing", on);
@@ -178,6 +179,5 @@ function bindUI() {
   document.getElementById("resetBtn").addEventListener("click", () => {
     resetAll();
     panel.classList.remove("show");
-    showHint("창문 위 메모를 모두 지웠어요");
   });
 }
