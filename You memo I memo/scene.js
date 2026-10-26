@@ -81,13 +81,8 @@ function renderScene(L, hour) {
     const my = hy * (1 - 0.8 * Math.sin(Math.PI * moonT));
     const mr = Math.min(w, h) * 0.034;
     glow(ctx, mx, my, mr * 7, [180, 200, 255], 0.28 * moonA);
-    ctx.fillStyle = "rgba(242,242,230," + moonA + ")";
+    ctx.fillStyle = "rgba(244,244,234," + moonA + ")";
     ctx.beginPath(); ctx.arc(mx, my, mr, 0, TAU); ctx.fill();
-    const cr = U.rng(5);
-    for (let i = 0; i < 5; i++) {
-      ctx.fillStyle = "rgba(160,165,175," + (0.22 * moonA) + ")";
-      ctx.beginPath(); ctx.arc(mx + (cr() - 0.5) * mr, my + (cr() - 0.5) * mr, mr * (0.12 + cr() * 0.16), 0, TAU); ctx.fill();
-    }
   }
 
   const cloudBase = U.mix(U.mix([255, 255, 255], S.hor, 0.38), S.top, S.dark * 0.7);
