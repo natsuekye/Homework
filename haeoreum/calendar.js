@@ -81,7 +81,7 @@ const Cal = (() => {
     if (!c) return null;
     return h('div', { class: 'closed-banner' },
       h('span', { class: 'closed-tag' }, '휴관일'),
-      h('p', {}, c.holiday ? `${c.holiday} · 도서관이 쉬는 날이에요` : `${c.label}은 도서관이 쉬는 날이에요`));
+      c.holiday ? h('p', {}, c.holiday) : null);
   }
 
   function editSheet(s, me) {

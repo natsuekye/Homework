@@ -112,7 +112,7 @@ h1, h2, p { margin: 0; }
   background: var(--bg); color: var(--pink);
 }
 
-.faces { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0 2px; margin: 0 -4px; }
+.faces { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0 2px; margin: 8px -4px; }
 .face { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
 .face .ava { margin-bottom: 1px; transition: transform .15s; }
 .face:active .ava { transform: scale(.94); }
