@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>해오름작은도서관</title>
+<meta name="apple-mobile-web-app-title" content="해오름작은도서관">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <section id="view-home" class="view">
+    <header class="top">
+      <div>
+        <p class="eyebrow">해오름작은도서관</p>
+        <h1 id="homeDate" class="title">오늘</h1>
+      </div>
+      <button id="meBtn" class="me-btn" aria-label="이 휴대폰을 쓰는 사람"></button>
+    </header>
+    <div id="homeBody" class="stack"></div>
+  </section>
+
+  <section id="view-check" class="view" hidden>
+    <header class="top">
+      <div>
+        <p id="checkDay" class="eyebrow">오늘</p>
+        <h1 class="title">오늘의 할 일</h1>
+      </div>
+      <button id="checkListBtn" class="icon-btn" aria-label="목록으로 보기"></button>
+    </header>
+    <div class="seg" id="slotSeg" role="tablist">
+      <button data-slot="am" role="tab">오전 · 여는 일</button>
+      <button data-slot="pm" role="tab">오후 · 닫는 일</button>
+    </div>
+    <div class="progress"><div id="checkBar" class="progress-fill"></div><span id="checkCount" class="progress-num">0 / 0</span></div>
+    <div id="checkBody"></div>
+  </section>
+
+  <section id="view-cal" class="view" hidden>
+    <header class="top">
+      <div>
+        <p class="eyebrow">우리 스케줄</p>
+        <h1 id="calTitle" class="title">달력</h1>
+      </div>
+      <div class="month-nav">
+        <button id="calPrev" class="icon-btn" aria-label="이전 달">‹</button>
+        <button id="calNext" class="icon-btn" aria-label="다음 달">›</button>
+      </div>
+    </header>
+    <div id="calFilter" class="chip-row"></div>
+    <div id="calGrid" class="cal-grid"></div>
+    <div id="calDay" class="stack"></div>
+  </section>
+
+  <nav id="tabbar">
+    <button class="tab" data-view="home"><span class="tab-ico" data-ico="home"></span><span>오늘</span></button>
+    <button class="tab" data-view="check"><span class="tab-ico" data-ico="check"></span><span>할 일</span></button>
+    <button id="waveBtn" class="wave-btn" aria-label="손 인사하기"><span class="tab-ico" data-ico="hand"></span></button>
+    <button class="tab" data-view="cal"><span class="tab-ico" data-ico="cal"></span><span>달력</span></button>
+    <button class="tab" id="meTab"><span class="tab-ico" data-ico="me"></span><span>나</span></button>
+  </nav>
+</div>
+
+<div id="cam" class="overlay cam" hidden>
+  <div class="cam-top">
+    <button id="camClose" class="round-btn" aria-label="닫기">✕</button>
+    <p class="cam-title">손 인사</p>
+    <span id="camRec" class="rec" hidden>REC</span>
+  </div>
+  <div class="cam-stage">
+    <video id="camVideo" playsinline muted autoplay></video>
+    <div id="camGuide" class="cam-guide"></div>
+    <div id="camMsg" class="cam-msg">카메라를 켜는 중이에요</div>
+  </div>
+  <div class="cam-bottom">
+    <div id="camGuess" class="guess">
+      <div id="guessAva" class="guess-ava"></div>
+      <div class="guess-text">
+        <p id="guessName" class="guess-name">손짓을 보여 주세요</p>
+        <p id="guessSub" class="guess-sub">내 손짓을 1초 동안 유지하면 출근이 기록돼요</p>
+      </div>
+      <svg class="guess-ring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" class="ring-bg"/><circle id="guessRing" cx="22" cy="22" r="19" class="ring-fg"/></svg>
+    </div>
+    <div id="camTest" class="cam-test" hidden>
+      <p class="cam-test-note">손짓 모델이 아직 연결되지 않았어요. 아래 얼굴을 꾹 누르고 있으면 그 사람의 손짓이 인식된 것처럼 시험할 수 있어요.</p>
+      <div id="camTestRow" class="cam-test-row"></div>
+    </div>
+  </div>
+  <div id="camResult" class="cam-result" hidden></div>
+</div>
+
+<div id="story" class="overlay story" hidden>
+  <div id="storyBars" class="story-bars"></div>
+  <div class="story-head">
+    <div id="storyWho" class="story-who"></div>
+    <button id="storyClose" class="round-btn dark" aria-label="닫기">✕</button>
+  </div>
+  <video id="storyVideo" playsinline muted autoplay></video>
+  <div id="storyEmpty" class="story-empty" hidden></div>
+  <button id="storyPrev" class="story-tap left" aria-label="이전"></button>
+  <button id="storyNext" class="story-tap right" aria-label="다음"></button>
+</div>
+
+<div id="sheetWrap" class="sheet-wrap" hidden>
+  <div id="sheetDim" class="sheet-dim"></div>
+  <div id="sheet" class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-grip"></div>
+    <h2 id="sheetTitle" class="sheet-title"></h2>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="store.js"></script>
+<script src="ui.js"></script>
+<script src="home.js"></script>
+<script src="story.js"></script>
+<script src="gesture.js"></script>
+<script src="shake.js"></script>
+<script src="checklist.js"></script>
+<script src="calendar.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
