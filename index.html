@@ -27,6 +27,9 @@
         padding: 20px;
         box-sizing: border-box;
         background: #fff;
+        z-index: 3;
+        transform: translateX(-100%);
+        transition: transform .25s ease;
       }
       #menu a {
         display: block;
@@ -34,20 +37,57 @@
         cursor: pointer;
         color: blue;
       }
-      /* iframe 영역: 메뉴(100px)를 뺀 나머지 화면 전체 */
+      /* iframe 영역: 메뉴가 열려 있으면 메뉴(100px)를 뺀 나머지, 닫혀 있으면 화면 전체 */
       #stage {
         position: fixed;
         top: 0;
         right: 0;
         bottom: 0;
-        left: 100px;
+        left: 0;
         overflow: hidden;
+        transition: left .25s ease;
       }
       #viewer {
         display: block;
         width: 100%;
         height: 100%;
         border: 0;
+      }
+      #toggle {
+        position: fixed;
+        top: 50%;
+        left: 0;
+        z-index: 4;
+        width: 18px;
+        height: 52px;
+        margin-top: -26px;
+        padding: 0;
+        border: 0;
+        border-radius: 0 10px 10px 0;
+        background: rgba(255, 255, 255, .92);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, .14);
+        color: #555;
+        font: 600 15px/52px sans-serif;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: left .25s ease;
+      }
+      #shade {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        background: rgba(0, 0, 0, .25);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .25s ease;
+      }
+      body.menu-open #menu { transform: none; }
+      body.menu-open #toggle { left: 100px; box-shadow: 2px 2px 8px rgba(0, 0, 0, .08); }
+      @media (min-width: 768px) {
+        body.menu-open #stage { left: 100px; }
+      }
+      @media (max-width: 767px) {
+        body.menu-open #shade { opacity: 1; pointer-events: auto; }
       }
     </style>
   </head>
@@ -59,15 +99,31 @@
       <a onclick="loadHomework('haeoreum')">Haeoreum</a>
     </div>
 
+    <button id="toggle" type="button" onclick="setMenu(!document.body.classList.contains('menu-open'))"></button>
+    <div id="shade" onclick="setMenu(false)"></div>
+
     <div id="stage">
       <!-- 처음 열었을 때 보여줄 과제 -->
-      <iframe id="viewer" src="haeoreum/index.html"></iframe>
+      <iframe id="viewer" src="haeoreum/index.html" allow="camera; microphone; accelerometer; gyroscope"></iframe>
     </div>
 
     <script>
+      const narrow = window.matchMedia("(max-width: 767px)");
+
+      function setMenu(open) {
+        document.body.classList.toggle("menu-open", open);
+        const btn = document.getElementById("toggle");
+        btn.textContent = open ? "‹" : "›";
+        btn.setAttribute("aria-label", open ? "메뉴 닫기" : "메뉴 열기");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+
+      setMenu(!narrow.matches);
+
       // 메뉴 클릭 시 iframe에 해당 폴더의 index.html을 불러옴
       function loadHomework(folderName) {
         document.getElementById("viewer").src = folderName + "/index.html";
+        if (narrow.matches) setMenu(false);
       }
     </script>
   </body>

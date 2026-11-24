@@ -196,6 +196,8 @@ h1, h2, p { margin: 0; }
   user-select: none;
 }
 .btn:active { transform: scale(.98); }
+.btn > span:has(> svg) { display: flex; }
+.btn svg { display: block; flex: none; }
 .btn.primary { background: var(--ink); color: #fff; }
 .btn.ok { background: var(--green); color: #fff; }
 .btn.ghost { background: var(--surface); color: var(--ink); }
