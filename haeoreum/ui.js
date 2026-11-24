@@ -22,7 +22,7 @@ const ICONS = {
   cal: '<rect x="4" y="5.5" width="16" height="14.5" rx="4"/><path d="M4 10h16M9 3.5v4M15 3.5v4"/>',
   me: '<circle cx="12" cy="9" r="3.6"/><path d="M5.5 19.5c1.3-3.2 3.8-4.8 6.5-4.8s5.2 1.6 6.5 4.8"/>',
   hand: '<path d="M8.5 12.5V6.8a1.4 1.4 0 0 1 2.8 0v4.7M11.3 11.5V5.2a1.4 1.4 0 0 1 2.8 0v6.3M14.1 11.5V6.4a1.4 1.4 0 0 1 2.8 0v6.8M16.9 10.3a1.4 1.4 0 0 1 2.8 0v4.1a6.6 6.6 0 0 1-6.6 6.6h-.9a6 6 0 0 1-4.9-2.6l-2.6-3.8a1.5 1.5 0 0 1 2.4-1.8l1.4 1.6"/>',
-  list: '<path d="M9 7h10M9 12h10M9 17h10"/><circle cx="5" cy="7" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="17" r="1"/>',
+  list: '<path d="M9 7h10M9 12h10M9 17h10"/><g fill="currentColor" stroke="none"><circle cx="5" cy="7" r="1.4"/><circle cx="5" cy="12" r="1.4"/><circle cx="5" cy="17" r="1.4"/></g>',
   cards: '<rect x="6" y="4" width="13" height="16" rx="3.5"/><path d="M3.5 7.5v10a3 3 0 0 0 3 3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   pencil: '<path d="M4.5 19.5h3.8L19 8.8a2.2 2.2 0 0 0-3.1-3.1L5.2 16.4z"/><path d="m14.2 7.4 3.1 3.1"/>',
