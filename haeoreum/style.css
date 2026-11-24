@@ -357,7 +357,6 @@ h1, h2, p { margin: 0; }
   box-shadow: inset 0 0 0 1.5px var(--ink3); display: grid; place-items: center; color: #fff;
 }
 .lcheck svg { width: 16px; height: 16px; }
-.lcheck:disabled { opacity: .35; }
 .lrow.on .lcheck { background: var(--green); box-shadow: none; }
 .lcheck.plus { color: var(--ink3); box-shadow: inset 0 0 0 1.5px var(--line); }
 .lrow-main {
@@ -369,7 +368,6 @@ h1, h2, p { margin: 0; }
 .lrow.holding .lrow-main { background: var(--surface-2); }
 .lrow-title { font-size: 14.5px; font-weight: 500; }
 .lrow.on .lrow-title { color: var(--ink3); }
-.lrow.off .lrow-title { color: var(--ink3); }
 .lrow-by { font-size: 11.5px; color: var(--ink3); }
 .lrow.add { color: var(--ink2); padding: 13px 0; }
 .lrow.add .lrow-title { padding-left: 8px; }

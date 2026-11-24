@@ -186,7 +186,7 @@ const Check = (() => {
 
     all.forEach(t => {
       if (editing === t.id) return list.append(taskForm(t));
-      const isToday = onDay(t, wd);
+      if (!onDay(t, wd)) return;
       const c = checks[t.id];
       const m = c && memberById(c.by);
       const sub = [
@@ -194,12 +194,11 @@ const Check = (() => {
         c ? (m ? `${m.name} · ${hm(c.at)}` : hm(c.at)) : null,
       ].filter(Boolean).join('  ·  ');
       const toggle = () => {
-        if (!isToday) return;
         if (c) Store.uncheck(today, slot, t.id);
         else Store.check(today, slot, t.id, Store.me());
       };
-      const row = h('div', { class: 'lrow' + (c ? ' on' : '') + (isToday ? '' : ' off'), 'data-tid': t.id },
-        h('button', { class: 'lcheck', disabled: !isToday, 'aria-label': t.title + (c ? ' 체크 풀기' : ' 체크'),
+      const row = h('div', { class: 'lrow' + (c ? ' on' : ''), 'data-tid': t.id },
+        h('button', { class: 'lcheck', 'aria-label': t.title + (c ? ' 체크 풀기' : ' 체크'),
           html: c ? icon('check', 16) : '', onclick: toggle }),
         h('div', { class: 'lrow-main', role: 'button', tabindex: '0', onclick: toggle,
           onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } } },
@@ -256,8 +255,10 @@ const Check = (() => {
         steps: steps.value.split('\n').map(s => s.trim()).filter(Boolean),
       };
       editing = null;
-      if (t) { Store.updateTask(slot, t.id, data); toast('할 일을 고쳤어요'); }
-      else { Store.addTask(slot, data); toast('할 일을 추가했어요'); }
+      const later = data.days && !data.days.includes(parseYmd(Store.today()).getDay())
+        ? `. ${data.days.map(d => WEEK_KO[d] + '요일').join('·')}에 보여요` : '';
+      if (t) { Store.updateTask(slot, t.id, data); toast('할 일을 고쳤어요' + later); }
+      else { Store.addTask(slot, data); toast('할 일을 추가했어요' + later); }
     };
     title.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
     return h('div', { class: 'lform' },
